@@ -1,0 +1,31 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# 環境変数（API キーを含む）
+.env
+.env.local
+.env*.local
+
+# データベース本体・バックアップ・削除退避
+/data/*.db
+/data/*.db-journal
+/data/*.db-wal
+/data/*.db-shm
+/data/backup/
+/data/deleted/
+
+# 実データを含むサンプルシード（個人情報のためコミット対象外）
+/data/sample-customers.json
+
+# misc
+.DS_Store
+*.log
+/coverage
+
+# TypeScript のインクリメンタルビルド情報
+*.tsbuildinfo

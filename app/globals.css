@@ -1,0 +1,62 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI",
+    "Noto Sans JP", system-ui, sans-serif;
+
+  --color-ink: oklch(0.21 0.02 260);
+  --color-muted: oklch(0.52 0.02 260);
+  --color-line: oklch(0.91 0.01 260);
+  --color-surface: oklch(1 0 0);
+  --color-canvas: oklch(0.975 0.005 260);
+
+  --color-brand: oklch(0.52 0.15 250);
+  --color-brand-soft: oklch(0.95 0.03 250);
+  --color-ok: oklch(0.55 0.14 155);
+  --color-ok-soft: oklch(0.95 0.05 155);
+  --color-warn: oklch(0.65 0.15 70);
+  --color-warn-soft: oklch(0.96 0.06 80);
+  --color-danger: oklch(0.55 0.19 25);
+  --color-danger-soft: oklch(0.96 0.04 25);
+}
+
+html {
+  color-scheme: light;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 数値列は等幅で桁を揃える */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* マトリクス表の固定列（§9 先頭2列を固定） */
+.sticky-col {
+  position: sticky;
+  background: var(--color-surface);
+  z-index: 2;
+}
+.sticky-col-shadow::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 6px;
+  transform: translateX(100%);
+  background: linear-gradient(to right, rgb(0 0 0 / 0.06), transparent);
+  pointer-events: none;
+}
+
+/* 印刷時はナビゲーションを隠す */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

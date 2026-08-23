@@ -1,0 +1,36 @@
+[
+  {
+    "code": "T01",
+    "name": "サンプル工業株式会社",
+    "facilityType": "需要設備",
+    "capacityKva": 210,
+    "inspectionCycle": "隔月点検",
+    "monthlyFee": 17500,
+    "annualFeeHandling": "included",
+    "annualInspectionFee": null,
+    "address": "愛知県名古屋市中区三の丸3-1-2",
+    "contactPerson": "山田 太郎",
+    "phone": "000-0000-0000",
+    "contractStartDate": "2026-03-01",
+    "annualInspectionMonth": 3,
+    "billingCycle": "毎月",
+    "paymentLagMonths": 1
+  },
+  {
+    "code": "T02",
+    "name": "サンプル製作所 第二工場",
+    "facilityType": "需要設備",
+    "capacityKva": 530,
+    "inspectionCycle": "隔月点検",
+    "monthlyFee": 14000,
+    "annualFeeHandling": "separate",
+    "annualInspectionFee": 40000,
+    "address": "愛知県豊田市西町3-60",
+    "contactPerson": "鈴木 花子",
+    "phone": "000-0000-0001",
+    "contractStartDate": "2026-04-01",
+    "annualInspectionMonth": 4,
+    "billingCycle": "毎月",
+    "paymentLagMonths": 1
+  }
+]
