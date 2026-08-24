@@ -1,12 +1,18 @@
+"use client";
+
+import { Suspense } from "react";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { InspectionCheck } from "@/components/schedule/inspection-check";
 import { PeriodNav } from "@/components/period-nav";
 import { ScopeFilter } from "@/components/scope-filter";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
 import { getInspectionTarget, scheduleSymbol } from "@/lib/calc/schedule";
-import { buildInspectionGrid } from "@/lib/monthly";
+import { useStore } from "@/lib/store/context";
+import { buildInspectionGrid } from "@/lib/store/monthly";
+import { getCustomerViews } from "@/lib/store/selectors";
 import { resolvePeriod } from "@/lib/period";
-import { getCustomerViews } from "@/lib/queries";
 import {
   cn,
   formatDate,
@@ -17,23 +23,19 @@ import {
   telHref,
 } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
-
 type SP = Record<string, string | undefined>;
 
-export default async function SchedulePage({
-  searchParams,
-}: {
-  searchParams: Promise<SP>;
-}) {
-  const sp = await searchParams;
+function SchedulePageInner() {
+  const params = useSearchParams();
+  const { doc, indexes } = useStore();
+
+  const sp: SP = Object.fromEntries(params.entries());
   const period = resolvePeriod(sp);
   const showAll = sp.active === "all";
   const typeFilter = sp.type === "regular" || sp.type === "annual" ? sp.type : "both";
 
-  const all = getCustomerViews();
-  const rows = all.filter((c) => showAll || c.isActive);
-  const { cellFor } = buildInspectionGrid(rows, period.year);
+  const rows = getCustomerViews(doc, indexes).filter((c) => showAll || c.isActive);
+  const { cellFor } = buildInspectionGrid(doc, period.year);
 
   // 当月リストは距離順（未取得は末尾）
   const monthCells = rows
@@ -339,5 +341,17 @@ function TypeFilter({ current, sp }: { current: string; sp: SP }) {
         </Link>
       ))}
     </div>
+  );
+}
+
+/**
+ * useSearchParams はレンダリング境界を要求するため Suspense で包む。
+ * 中身はブラウザ側で描画される。
+ */
+export default function SchedulePage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-sm text-muted">読み込んでいます…</p>}>
+      <SchedulePageInner />
+    </Suspense>
   );
 }

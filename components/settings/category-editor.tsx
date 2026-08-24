@@ -1,21 +1,20 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useState } from "react";
+import { Badge, Button, Card, CardHeader, Field, Input, Select } from "@/components/ui";
+import { useStore } from "@/lib/store/context";
+import type {
+  CategoryCycle,
+  CategoryGroup,
+  CoefficientTable,
+  EquipmentCategory,
+} from "@/lib/store/document";
 import {
   deleteCategoryCycle,
   saveCategoryCycle,
   saveEquipmentCategory,
-  type SettingsState,
-} from "@/app/actions/settings";
-import { Badge, Button, Card, CardHeader, Field, Input, Select } from "@/components/ui";
-import type {
-  CategoryCycle,
-  CoefficientTable,
-  EquipmentCategory,
-} from "@/db/schema";
+} from "@/lib/store/mutations";
 import { cn } from "@/lib/utils";
-
-const initial: SettingsState = { status: "idle" };
 
 const GROUP_LABEL: Record<EquipmentCategory["categoryGroup"], string> = {
   demand: "需要設備",
@@ -23,16 +22,22 @@ const GROUP_LABEL: Record<EquipmentCategory["categoryGroup"], string> = {
   other: "その他",
 };
 
-function Status({ state }: { state: SettingsState }) {
-  if (state.status === "idle") return null;
-  return (
-    <p
-      className={state.status === "ok" ? "text-xs text-ok" : "text-xs text-danger"}
-      role="status"
-    >
-      {state.message}
-    </p>
-  );
+function Status({ ok, error }: { ok?: string | null; error?: string | null }) {
+  if (error) {
+    return (
+      <p className="text-xs text-danger" role="alert">
+        {error}
+      </p>
+    );
+  }
+  if (ok) {
+    return (
+      <p className="text-xs text-ok" role="status">
+        {ok}
+      </p>
+    );
+  }
+  return null;
 }
 
 /**
@@ -127,9 +132,47 @@ function CategoryForm({
   coefficientTables: CoefficientTable[];
   sortOrder: number;
 }) {
-  const [state, action, pending] = useActionState(saveEquipmentCategory, initial);
+  const { update } = useStore();
+  const [name, setName] = useState(category?.name ?? "");
+  const [group, setGroup] = useState<CategoryGroup>(category?.categoryGroup ?? "demand");
   const [method, setMethod] = useState(category?.calculationMethod ?? "table");
   const [unit, setUnit] = useState(category?.capacityUnit ?? "kVA");
+  const [tableId, setTableId] = useState(category?.coefficientTableId?.toString() ?? "");
+  const [minCapacity, setMinCapacity] = useState(category?.minCapacity?.toString() ?? "");
+  const [maxCapacity, setMaxCapacity] = useState(category?.maxCapacity?.toString() ?? "");
+  const [note, setNote] = useState(category?.note ?? "");
+  const [order, setOrder] = useState(String(category?.sortOrder ?? sortOrder));
+  const [isActive, setIsActive] = useState(String(category?.isActive ?? 1));
+  const [ok, setOk] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setOk(null);
+    setError(null);
+
+    if (!name.trim()) return setError("表示名は必須です");
+    if (method === "table" && !tableId) {
+      return setError("係数表方式では換算係数テーブルの指定が必要です");
+    }
+
+    update((doc) =>
+      saveEquipmentCategory(doc, {
+        id: category?.id ?? null,
+        name: name.trim(),
+        categoryGroup: group,
+        capacityUnit: unit,
+        calculationMethod: method,
+        coefficientTableId: tableId ? Number(tableId) : null,
+        minCapacity: minCapacity === "" ? null : Number(minCapacity),
+        maxCapacity: maxCapacity === "" ? null : Number(maxCapacity),
+        note,
+        sortOrder: Number(order) || 0,
+        isActive: isActive === "0" ? 0 : 1,
+      }),
+    );
+    setOk(category ? "更新しました" : "追加しました");
+  };
 
   return (
     <Card>
@@ -137,17 +180,16 @@ function CategoryForm({
         title={category ? "区分の設定" : "新しい区分"}
         description="係数表方式は「容量から係数を引いて倍率を掛ける」、固定方式は「周期ごとの固定点数」です"
       />
-      <form action={action}>
-        <input type="hidden" name="id" value={category?.id ?? ""} />
+      <form onSubmit={submit}>
         <div className="grid gap-3 p-4 sm:grid-cols-2">
           <Field label="表示名" required className="sm:col-span-2">
-            <Input name="name" defaultValue={category?.name ?? ""} />
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
 
           <Field label="グループ">
             <Select
-              name="categoryGroup"
-              defaultValue={category?.categoryGroup ?? "demand"}
+              value={group}
+              onChange={(e) => setGroup(e.target.value as CategoryGroup)}
             >
               <option value="demand">需要設備</option>
               <option value="generation">発電所等</option>
@@ -157,7 +199,6 @@ function CategoryForm({
 
           <Field label="点数の決め方">
             <Select
-              name="calculationMethod"
               value={method}
               onChange={(e) => setMethod(e.target.value as "table" | "fixed")}
             >
@@ -168,7 +209,6 @@ function CategoryForm({
 
           <Field label="容量の単位">
             <Select
-              name="capacityUnit"
               value={unit}
               onChange={(e) => setUnit(e.target.value as "kVA" | "kW" | "none")}
             >
@@ -184,8 +224,8 @@ function CategoryForm({
             hint={method === "fixed" ? "固定方式では使いません" : undefined}
           >
             <Select
-              name="coefficientTableId"
-              defaultValue={category?.coefficientTableId ?? ""}
+              value={tableId}
+              onChange={(e) => setTableId(e.target.value)}
               disabled={method === "fixed"}
             >
               <option value="">未設定</option>
@@ -199,34 +239,34 @@ function CategoryForm({
 
           <Field label="適用容量の下限" hint="範囲外のとき入力画面で警告します">
             <Input
-              name="minCapacity"
               type="number"
               step="0.1"
-              defaultValue={category?.minCapacity ?? ""}
+              value={minCapacity}
+              onChange={(e) => setMinCapacity(e.target.value)}
             />
           </Field>
           <Field label="適用容量の上限">
             <Input
-              name="maxCapacity"
               type="number"
               step="0.1"
-              defaultValue={category?.maxCapacity ?? ""}
+              value={maxCapacity}
+              onChange={(e) => setMaxCapacity(e.target.value)}
             />
           </Field>
 
           <Field label="メモ" className="sm:col-span-2">
-            <Input name="note" defaultValue={category?.note ?? ""} />
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
           </Field>
 
           <Field label="表示順">
             <Input
-              name="sortOrder"
               type="number"
-              defaultValue={category?.sortOrder ?? sortOrder}
+              value={order}
+              onChange={(e) => setOrder(e.target.value)}
             />
           </Field>
           <Field label="状態">
-            <Select name="isActive" defaultValue={category?.isActive ?? 1}>
+            <Select value={isActive} onChange={(e) => setIsActive(e.target.value)}>
               <option value="1">有効</option>
               <option value="0">無効</option>
             </Select>
@@ -234,10 +274,10 @@ function CategoryForm({
         </div>
 
         <div className="flex items-center gap-3 border-t border-line px-4 py-3">
-          <Button type="submit" size="sm" disabled={pending}>
-            {pending ? "保存中…" : category ? "更新する" : "追加する"}
+          <Button type="submit" size="sm">
+            {category ? "更新する" : "追加する"}
           </Button>
-          <Status state={state} />
+          <Status ok={ok} error={error} />
         </div>
       </form>
     </Card>
@@ -282,81 +322,115 @@ function CycleForm({
   cycle?: CategoryCycle;
   sortOrder?: number;
 }) {
-  const [state, action, pending] = useActionState(saveCategoryCycle, initial);
-  const [deletePending, startDelete] = useTransition();
-  const [deleteMessage, setDeleteMessage] = useState<string | null>(null);
+  const { update, updateWith } = useStore();
   const isTable = category.calculationMethod === "table";
 
-  return (
-    <form action={action} className="p-3">
-      <input type="hidden" name="id" value={cycle?.id ?? ""} />
-      <input type="hidden" name="categoryId" value={category.id} />
+  const [name, setName] = useState(cycle?.name ?? "");
+  const [intervalMonths, setIntervalMonths] = useState(String(cycle?.intervalMonths ?? 1));
+  const [value, setValue] = useState(
+    (isTable ? cycle?.multiplier : cycle?.fixedPoints)?.toString() ?? "",
+  );
+  const [conditionNote, setConditionNote] = useState(cycle?.conditionNote ?? "");
+  const [order, setOrder] = useState(String(cycle?.sortOrder ?? sortOrder ?? 0));
+  const [requiresMonitor, setRequiresMonitor] = useState(
+    !!cycle?.requiresInsulationMonitor,
+  );
+  const [error, setError] = useState<string | null>(null);
 
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const interval = Number(intervalMonths);
+    const num = value === "" ? null : Number(value);
+
+    if (!name.trim()) return setError("周期名は必須です");
+    if (!Number.isFinite(interval) || interval < 0) {
+      return setError("実施間隔は 0 以上の整数で入力してください");
+    }
+    if (num == null || !Number.isFinite(num)) {
+      return setError(isTable ? "倍率が必要です" : "固定点数が必要です");
+    }
+
+    update((doc) =>
+      saveCategoryCycle(doc, {
+        id: cycle?.id ?? null,
+        categoryId: category.id,
+        name: name.trim(),
+        intervalMonths: interval,
+        multiplier: isTable ? num : null,
+        fixedPoints: isTable ? null : num,
+        requiresInsulationMonitor: requiresMonitor ? 1 : 0,
+        conditionNote,
+        sortOrder: Number(order) || 0,
+      }),
+    );
+
+    if (!cycle) {
+      setName("");
+      setValue("");
+      setConditionNote("");
+    }
+  };
+
+  const remove = () => {
+    setError(null);
+    if (!cycle) return;
+    const result = updateWith((doc) => {
+      const r = deleteCategoryCycle(doc, cycle.id);
+      return { doc: r.doc, result: r };
+    });
+    if (!result.ok) setError(result.message ?? "削除できませんでした");
+  };
+
+  return (
+    <form onSubmit={submit} className="p-3">
       <div className="grid items-end gap-2 sm:grid-cols-[minmax(7rem,1.4fr)_5.5rem_6rem_minmax(6rem,1fr)_4rem_auto]">
         <Field label="周期名">
-          <Input name="name" defaultValue={cycle?.name ?? ""} placeholder="2ヶ月に1回" />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="2ヶ月に1回"
+          />
         </Field>
         <Field label="間隔(月)">
           <Input
-            name="intervalMonths"
             type="number"
             min="0"
             max="12"
-            defaultValue={cycle?.intervalMonths ?? 1}
+            value={intervalMonths}
+            onChange={(e) => setIntervalMonths(e.target.value)}
           />
         </Field>
-        {isTable ? (
-          <Field label="倍率">
-            <Input
-              name="multiplier"
-              type="number"
-              step="0.001"
-              min="0"
-              defaultValue={cycle?.multiplier ?? ""}
-            />
-          </Field>
-        ) : (
-          <Field label="固定点数">
-            <Input
-              name="fixedPoints"
-              type="number"
-              step="0.001"
-              min="0"
-              defaultValue={cycle?.fixedPoints ?? ""}
-            />
-          </Field>
-        )}
+        <Field label={isTable ? "倍率" : "固定点数"}>
+          <Input
+            type="number"
+            step="0.001"
+            min="0"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+        </Field>
         <Field label="注記">
           <Input
-            name="conditionNote"
-            defaultValue={cycle?.conditionNote ?? ""}
+            value={conditionNote}
+            onChange={(e) => setConditionNote(e.target.value)}
             placeholder="条件適用 など"
           />
         </Field>
         <Field label="表示順">
           <Input
-            name="sortOrder"
             type="number"
-            defaultValue={cycle?.sortOrder ?? sortOrder ?? 0}
+            value={order}
+            onChange={(e) => setOrder(e.target.value)}
           />
         </Field>
         <div className="flex items-center gap-1.5 pb-0.5">
-          <Button type="submit" variant="outline" size="sm" disabled={pending}>
+          <Button type="submit" variant="outline" size="sm">
             {cycle ? "更新" : "＋ 追加"}
           </Button>
           {cycle && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={deletePending}
-              onClick={() =>
-                startDelete(async () => {
-                  const r = await deleteCategoryCycle(cycle.id);
-                  if (!r.ok) setDeleteMessage(r.message);
-                })
-              }
-            >
+            <Button type="button" variant="ghost" size="sm" onClick={remove}>
               削除
             </Button>
           )}
@@ -367,14 +441,13 @@ function CycleForm({
         <label className="flex items-center gap-1.5 text-xs text-muted">
           <input
             type="checkbox"
-            name="requiresInsulationMonitor"
-            defaultChecked={!!cycle?.requiresInsulationMonitor}
+            checked={requiresMonitor}
+            onChange={(e) => setRequiresMonitor(e.target.checked)}
           />
           絶縁監視装置が必須
         </label>
         {cycle?.requiresInsulationMonitor ? <Badge tone="warn">必須</Badge> : null}
-        <Status state={state} />
-        {deleteMessage && <p className="text-xs text-danger">{deleteMessage}</p>}
+        <Status error={error} />
       </div>
     </form>
   );

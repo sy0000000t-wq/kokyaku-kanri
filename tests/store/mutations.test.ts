@@ -16,6 +16,7 @@ import {
   updateDistance,
   type CustomerInput,
 } from "@/lib/store/mutations";
+import { validateCustomer } from "@/lib/store/validation";
 import type { AppDocument } from "@/lib/store/document";
 
 function categoryCycle(doc: AppDocument, categoryName: string, cycleName: string) {
@@ -351,5 +352,87 @@ describe("マスタ", () => {
     expect(next.coefficientRows.filter((r) => r.tableId !== demand)).toHaveLength(
       solarRowsBefore.length,
     );
+  });
+});
+
+describe("validateCustomer", () => {
+  it("必須項目が空なら弾く", () => {
+    const doc = createInitialDocument();
+    const errors = validateCustomer(doc, {
+      ...input(doc),
+      code: "",
+      name: "",
+      address: "",
+    });
+    expect(errors.code).toBeDefined();
+    expect(errors.name).toBeDefined();
+    expect(errors.address).toBeDefined();
+  });
+
+  it("顧客IDの重複を弾く（自分自身は除く）", () => {
+    const doc = createInitialDocument();
+    const { doc: saved, customerId } = saveCustomer(doc, input(doc));
+
+    expect(validateCustomer(saved, input(saved)).code).toBeDefined();
+    expect(
+      validateCustomer(saved, { ...input(saved), id: customerId }).code,
+    ).toBeUndefined();
+  });
+
+  it("設備が無ければ弾く", () => {
+    const doc = createInitialDocument();
+    const errors = validateCustomer(doc, { ...input(doc), facilities: [] });
+    expect(errors.facilities).toBeDefined();
+  });
+
+  it("係数表方式で容量も換算係数も無ければ弾く", () => {
+    const doc = createInitialDocument();
+    const base = input(doc);
+    const errors = validateCustomer(doc, {
+      ...base,
+      facilities: [{ ...base.facilities[0], capacity: null }],
+    });
+    expect(errors.facilities).toContain("設備容量、または換算係数");
+  });
+
+  it("換算係数を手で入れてあれば容量が無くても通る", () => {
+    const doc = createInitialDocument();
+    const base = input(doc);
+    const errors = validateCustomer(doc, {
+      ...base,
+      facilities: [{ ...base.facilities[0], capacity: null, coefficientOverride: 0.8 }],
+    });
+    expect(errors.facilities).toBeUndefined();
+  });
+
+  it("固定点数の区分は容量が無くても通る", () => {
+    const doc = createInitialDocument();
+    const lowVoltage = categoryCycle(doc, "需要設備（低圧）", "月1回");
+    const errors = validateCustomer(doc, {
+      ...input(doc),
+      facilities: [
+        { id: null, ...lowVoltage, capacity: null, coefficientOverride: null, note: "" },
+      ],
+    });
+    expect(errors.facilities).toBeUndefined();
+  });
+
+  it("解除日が契約開始日より前なら弾く", () => {
+    const doc = createInitialDocument();
+    const errors = validateCustomer(doc, {
+      ...input(doc),
+      contractEndDate: "2026-01-01",
+    });
+    expect(errors.contractEndDate).toBeDefined();
+  });
+
+  it("別途請求なのに年次点検費が無ければ弾く", () => {
+    const doc = createInitialDocument();
+    const errors = validateCustomer(doc, {
+      ...input(doc),
+      annualFeeHandling: "separate",
+      annualInspectionFee: null,
+    });
+    expect(errors.annualInspectionFee).toBeDefined();
   });
 });

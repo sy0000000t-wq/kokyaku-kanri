@@ -1,8 +1,8 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
-import { setBilled, setBillingAmount, setPaid } from "@/app/actions/billing";
-import { useToast } from "@/components/toast";
+import { useState } from "react";
+import { useStore } from "@/lib/store/context";
+import { setBilled, setBillingAmount, setPaid } from "@/lib/store/mutations";
 import { cn, formatYen } from "@/lib/utils";
 
 export type BillingKeyProps = {
@@ -14,19 +14,18 @@ export type BillingKeyProps = {
   paymentLagMonths: number;
 };
 
-function useBillingToggle(props: BillingKeyProps) {
-  const toast = useToast();
-  const [, startTransition] = useTransition();
-
-  const common = {
-    customerId: props.customerId,
-    year: props.year,
-    month: props.month,
-    defaultAmount: props.defaultAmount,
-    paymentLagMonths: props.paymentLagMonths,
+function useBillingKey(props: BillingKeyProps) {
+  const { update } = useStore();
+  return {
+    update,
+    common: {
+      customerId: props.customerId,
+      year: props.year,
+      month: props.month,
+      defaultAmount: props.defaultAmount,
+      paymentLagMonths: props.paymentLagMonths,
+    },
   };
-
-  return { toast, startTransition, common };
 }
 
 /** 請求済みチェック（1クリックで確定・楽観的更新） */
@@ -35,26 +34,17 @@ export function BilledCheck({
   label,
   ...props
 }: BillingKeyProps & { isBilled: boolean; label?: string }) {
-  const { toast, startTransition, common } = useBillingToggle(props);
-  const [billed, setOptimistic] = useOptimistic(isBilled);
+  const { update, common } = useBillingKey(props);
 
   return (
     <label className="flex cursor-pointer items-center gap-1 text-[11px]">
       <input
         type="checkbox"
         className="size-3.5 accent-[oklch(0.52_0.15_250)]"
-        checked={billed}
-        onChange={() => {
-          const next = !billed;
-          startTransition(async () => {
-            setOptimistic(next);
-            try {
-              await setBilled({ ...common, isBilled: next });
-            } catch {
-              toast(`${props.customerName} の請求チェックを更新できませんでした`, "danger");
-            }
-          });
-        }}
+        checked={isBilled}
+        onChange={(e) =>
+          update((doc) => setBilled(doc, { ...common, isBilled: e.target.checked }))
+        }
         aria-label={`${props.customerName} ${props.year}年${props.month}月 請求済み`}
       />
       {label ?? "請"}
@@ -68,26 +58,17 @@ export function PaidCheck({
   label,
   ...props
 }: BillingKeyProps & { isPaid: boolean; label?: string }) {
-  const { toast, startTransition, common } = useBillingToggle(props);
-  const [paid, setOptimistic] = useOptimistic(isPaid);
+  const { update, common } = useBillingKey(props);
 
   return (
     <label className="flex cursor-pointer items-center gap-1 text-[11px]">
       <input
         type="checkbox"
         className="size-3.5 accent-[oklch(0.55_0.14_155)]"
-        checked={paid}
-        onChange={() => {
-          const next = !paid;
-          startTransition(async () => {
-            setOptimistic(next);
-            try {
-              await setPaid({ ...common, isPaid: next });
-            } catch {
-              toast(`${props.customerName} の入金チェックを更新できませんでした`, "danger");
-            }
-          });
-        }}
+        checked={isPaid}
+        onChange={(e) =>
+          update((doc) => setPaid(doc, { ...common, isPaid: e.target.checked }))
+        }
         aria-label={`${props.customerName} ${props.year}年${props.month}月 入金済み`}
       />
       {label ?? "入"}
@@ -101,21 +82,13 @@ export function BillingAmount({
   className,
   ...props
 }: BillingKeyProps & { amount: number; className?: string }) {
-  const { toast, startTransition, common } = useBillingToggle(props);
+  const { update, common } = useBillingKey(props);
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(amount);
 
   const commit = (next: number) => {
     setEditing(false);
-    if (!Number.isFinite(next) || next === value) return;
-    setValue(next);
-    startTransition(async () => {
-      try {
-        await setBillingAmount({ ...common, amount: next });
-      } catch {
-        toast(`${props.customerName} の請求額を更新できませんでした`, "danger");
-      }
-    });
+    if (!Number.isFinite(next) || next === amount) return;
+    update((doc) => setBillingAmount(doc, { ...common, amount: next }));
   };
 
   if (editing) {
@@ -123,7 +96,7 @@ export function BillingAmount({
       <input
         type="number"
         autoFocus
-        defaultValue={value}
+        defaultValue={amount}
         className={cn(
           "tabular h-6 w-full rounded border border-line px-1 text-right text-xs",
           className,
@@ -145,7 +118,7 @@ export function BillingAmount({
       className={cn("tabular block w-full text-right text-xs hover:underline", className)}
       title="クリックで請求額を編集"
     >
-      {formatYen(value)}
+      {formatYen(amount)}
     </button>
   );
 }

@@ -1,14 +1,15 @@
+"use client";
+
 import Link from "next/link";
-import { nextCustomerCode } from "@/app/actions/customer";
 import { CustomerForm } from "@/components/customers/customer-form";
 import { emptyCustomer } from "@/lib/customer-form-types";
-import { toFormMasters } from "@/lib/form-masters";
+import { useStore } from "@/lib/store/context";
+import { toFormMasters } from "@/lib/store/form-masters";
+import { nextCustomerCode } from "@/lib/store/mutations";
 
-export const dynamic = "force-dynamic";
-
-export default async function NewCustomerPage() {
-  const masters = toFormMasters();
-  const code = await nextCustomerCode();
+export default function NewCustomerPage() {
+  const { doc, indexes } = useStore();
+  const masters = toFormMasters(doc, indexes);
 
   return (
     <div className="space-y-4">
@@ -18,7 +19,10 @@ export default async function NewCustomerPage() {
         </Link>
         <h1 className="text-lg font-semibold">顧客の新規登録</h1>
       </div>
-      <CustomerForm masters={masters} initial={emptyCustomer(masters, code)} />
+      <CustomerForm
+        masters={masters}
+        initial={emptyCustomer(masters, nextCustomerCode(doc))}
+      />
     </div>
   );
 }

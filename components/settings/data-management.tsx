@@ -1,39 +1,146 @@
 "use client";
 
-import { useActionState } from "react";
-import { importJson, type ImportState } from "@/app/actions/data";
-import { Button, buttonClass, Card, CardHeader, Input } from "@/components/ui";
-import { formatNumber } from "@/lib/utils";
+import { useRef, useState } from "react";
+import { Button, Card, CardHeader, Input } from "@/components/ui";
+import { downloadFile, toCsv } from "@/lib/csv";
+import { useStore } from "@/lib/store/context";
+import { parseDocument } from "@/lib/store/seed";
+import { getCustomerViews } from "@/lib/store/selectors";
+import { summarizeFacility, todayIso } from "@/lib/utils";
 
-const initial: ImportState = { status: "idle" };
+/** データ管理：書き出しと取り込み */
+export function DataManagement() {
+  const { doc, indexes, replace } = useStore();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-/** 6. データ管理 */
-export function DataManagement({
-  backups,
-  dbPath,
-}: {
-  backups: { file: string; size: number; mtime: string }[];
-  dbPath: string;
-}) {
-  const [state, action, pending] = useActionState(importJson, initial);
+  const views = getCustomerViews(doc, indexes);
+  const nameOf = (id: number) => views.find((v) => v.id === id);
+
+  const exportJson = () =>
+    downloadFile(
+      `顧客管理_バックアップ_${todayIso()}.json`,
+      JSON.stringify(doc, null, 2),
+      "application/json",
+    );
+
+  const exportInspections = () => {
+    const csv = toCsv(
+      ["顧客ID", "物件名称", "年", "月", "点検種別", "実施済み", "実施日", "備考"],
+      [...doc.inspectionRecords]
+        .sort((a, b) => a.year - b.year || a.month - b.month || a.customerId - b.customerId)
+        .map((r) => {
+          const c = nameOf(r.customerId);
+          return [
+            c?.code ?? r.customerId,
+            c?.name ?? "",
+            r.year,
+            r.month,
+            r.type === "annual" ? "年次点検" : "通常点検",
+            r.isDone ? "済" : "",
+            r.doneDate ?? "",
+            r.note ?? "",
+          ];
+        }),
+    );
+    downloadFile(`点検実績_${todayIso()}.csv`, csv, "text/csv");
+  };
+
+  const exportBillings = () => {
+    const csv = toCsv(
+      [
+        "顧客ID",
+        "物件名称",
+        "請求年",
+        "請求月",
+        "請求額(税込)",
+        "請求済み",
+        "請求日",
+        "入金予定年",
+        "入金予定月",
+        "入金済み",
+        "入金日",
+        "備考",
+      ],
+      [...doc.billingRecords]
+        .sort((a, b) => a.year - b.year || a.month - b.month || a.customerId - b.customerId)
+        .map((r) => {
+          const c = nameOf(r.customerId);
+          return [
+            c?.code ?? r.customerId,
+            c?.name ?? "",
+            r.year,
+            r.month,
+            r.billingAmount,
+            r.isBilled ? "済" : "",
+            r.billedDate ?? "",
+            r.expectedPaymentYear,
+            r.expectedPaymentMonth,
+            r.isPaid ? "済" : "",
+            r.paidDate ?? "",
+            r.note ?? "",
+          ];
+        }),
+    );
+    downloadFile(`請求実績_${todayIso()}.csv`, csv, "text/csv");
+  };
+
+  const exportCustomers = () => {
+    const csv = toCsv(
+      ["顧客ID", "物件名称", "設備", "保安管理点数", "月額(税抜)", "年額(税抜)", "点数単価", "住所", "状態"],
+      views.map((c) => [
+        c.code,
+        c.name,
+        c.facilities
+          .map((f) =>
+            summarizeFacility(f.category?.name, f.capacity, f.category?.capacityUnit),
+          )
+          .join(" / "),
+        c.points ?? "",
+        c.pricing.monthlyExcl,
+        c.pricing.annualExcl,
+        c.pricing.unitPrice ?? "",
+        c.address,
+        c.isActive ? "稼働中" : "解除",
+      ]),
+    );
+    downloadFile(`顧客マスタ_${todayIso()}.csv`, csv, "text/csv");
+  };
+
+  const importJson = async (file: File) => {
+    setMessage(null);
+    setError(null);
+    try {
+      const next = parseDocument(JSON.parse(await file.text()));
+      replace(next);
+      setMessage(
+        `顧客 ${next.customers.length} 件、点検実績 ${next.inspectionRecords.length} 件、請求実績 ${next.billingRecords.length} 件を取り込みました`,
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
 
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader title="エクスポート" description="ブラウザにダウンロードされます" />
         <div className="flex flex-wrap gap-2 p-4">
-          <a href="/api/export/json" className={buttonClass("default", "sm")}>
+          <Button size="sm" onClick={exportJson}>
             JSON 一括エクスポート
-          </a>
-          <a href="/api/export/customers" className={buttonClass("outline", "sm")}>
+          </Button>
+          <Button size="sm" variant="outline" onClick={exportCustomers}>
             顧客マスタ CSV
-          </a>
-          <a href="/api/export/inspections" className={buttonClass("outline", "sm")}>
+          </Button>
+          <Button size="sm" variant="outline" onClick={exportInspections}>
             点検実績 CSV
-          </a>
-          <a href="/api/export/billings" className={buttonClass("outline", "sm")}>
+          </Button>
+          <Button size="sm" variant="outline" onClick={exportBillings}>
             請求実績 CSV
-          </a>
+          </Button>
         </div>
       </Card>
 
@@ -42,55 +149,49 @@ export function DataManagement({
           title="JSON インポート"
           description="現在のデータをすべて置き換えます。実行前に JSON エクスポートを取ってください"
         />
-        <form action={action} className="flex flex-wrap items-center gap-2 p-4">
+        <div className="flex flex-wrap items-center gap-2 p-4">
           <Input
+            ref={fileRef}
             type="file"
-            name="file"
             accept="application/json,.json"
             className="h-auto max-w-xs py-1.5"
-            required
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void importJson(file);
+            }}
           />
-          <Button type="submit" variant="danger" size="sm" disabled={pending}>
-            {pending ? "取り込み中…" : "インポートして置き換える"}
-          </Button>
-          {state.status !== "idle" && (
-            <p
-              className={
-                state.status === "ok" ? "text-xs text-ok" : "text-xs text-danger"
-              }
-              role="status"
-            >
-              {state.message}
+          {message && (
+            <p className="text-xs text-ok" role="status">
+              {message}
             </p>
           )}
-        </form>
+          {error && (
+            <p className="text-xs text-danger" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
       </Card>
 
       <Card>
-        <CardHeader
-          title="自動バックアップ"
-          description="起動時に data/backup/app-YYYYMMDD.db へ保存し、30日で自動削除します"
-        />
-        {backups.length === 0 ? (
-          <p className="px-4 py-6 text-center text-sm text-muted">
-            バックアップはまだありません。
-          </p>
-        ) : (
-          <ul className="divide-y divide-line text-sm">
-            {backups.map((b) => (
-              <li key={b.file} className="flex items-center justify-between gap-3 px-4 py-2">
-                <span className="font-mono text-xs">{b.file}</span>
-                <span className="tabular text-xs text-muted">
-                  {formatNumber(Math.round(b.size / 1024))} KB
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="border-t border-line px-4 py-2.5 text-xs text-muted">
-          復元するときはアプリを停止し、バックアップファイルを{" "}
-          <code className="font-mono">{dbPath}</code> に上書きコピーしてから再起動します。
-        </p>
+        <CardHeader title="いまのデータ" />
+        <dl className="divide-y divide-line text-sm">
+          {[
+            ["顧客", doc.customers.length],
+            ["設備", doc.customerFacilities.length],
+            ["点検実績", doc.inspectionRecords.length],
+            ["請求実績", doc.billingRecords.length],
+          ].map(([label, count]) => (
+            <div key={label} className="flex justify-between px-4 py-2">
+              <dt className="text-xs text-muted">{label}</dt>
+              <dd className="tabular">{count} 件</dd>
+            </div>
+          ))}
+          <div className="flex justify-between px-4 py-2">
+            <dt className="text-xs text-muted">最終更新</dt>
+            <dd className="tabular text-xs">{doc.savedAt}</dd>
+          </div>
+        </dl>
       </Card>
     </div>
   );

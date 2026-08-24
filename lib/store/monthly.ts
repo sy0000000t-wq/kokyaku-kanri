@@ -1,5 +1,3 @@
-import "server-only";
-import type { BillingRecord, InspectionRecord } from "@/db/schema";
 import {
   calcDefaultBillingAmount,
   calcExpectedPayment,
@@ -8,14 +6,15 @@ import {
   monthsOverdue,
 } from "@/lib/calc/billing";
 import { getInspectionTarget, type YearMonth } from "@/lib/calc/schedule";
-import {
-  billingKey,
-  getBillingRecords,
-  getInspectionRecords,
-  inspectionKey,
-  type InspectionType,
-} from "@/lib/records";
-import type { CustomerView } from "@/lib/queries";
+import type {
+  AppDocument,
+  BillingRecord,
+  InspectionRecord,
+  InspectionType,
+} from "./document";
+import type { CustomerView } from "./selectors";
+
+/** 月ごとの導出。ダッシュボード・スケジュール・請求で共用する */
 
 export type InspectionCell = {
   customer: CustomerView;
@@ -29,7 +28,6 @@ export type InspectionCell = {
 export type BillingCell = {
   customer: CustomerView;
   isTarget: boolean;
-  /** 保存済みの請求額、無ければ既定の自動計算値 */
   amount: number;
   defaultAmount: number;
   isBilled: boolean;
@@ -42,9 +40,16 @@ export type BillingCell = {
   record: BillingRecord | null;
 };
 
-/** 指定年の点検実績を、顧客×月×種別で参照できるようにまとめる */
-export function buildInspectionGrid(customers: CustomerView[], year: number) {
-  const records = getInspectionRecords(year);
+const inspectionKey = (customerId: number, month: number, type: InspectionType) =>
+  `${customerId}:${month}:${type}`;
+const billingKey = (customerId: number, month: number) => `${customerId}:${month}`;
+
+/** 指定年の点検実績を、顧客×月×種別で引けるようにまとめる */
+export function buildInspectionGrid(doc: AppDocument, year: number) {
+  const records = new Map<string, InspectionRecord>();
+  for (const r of doc.inspectionRecords) {
+    if (r.year === year) records.set(inspectionKey(r.customerId, r.month, r.type), r);
+  }
 
   const cellFor = (
     customer: CustomerView,
@@ -76,13 +81,16 @@ export function buildInspectionGrid(customers: CustomerView[], year: number) {
   return { records, cellFor };
 }
 
-/** 指定年の請求・入金実績を顧客×月で参照できるようにまとめる */
+/** 指定年の請求・入金実績を顧客×月で引けるようにまとめる */
 export function buildBillingGrid(
-  customers: CustomerView[],
+  doc: AppDocument,
   year: number,
   today: YearMonth,
 ) {
-  const records = getBillingRecords(year);
+  const records = new Map<string, BillingRecord>();
+  for (const r of doc.billingRecords) {
+    if (r.year === year) records.set(billingKey(r.customerId, r.month), r);
+  }
 
   const cellFor = (customer: CustomerView, month: number): BillingCell => {
     const isTarget = isBillingTarget(
@@ -131,14 +139,15 @@ export function buildBillingGrid(
   return { records, cellFor };
 }
 
-/** §5.2 今月サマリー */
+/** 今月サマリー */
 export function summarizeMonth(
+  doc: AppDocument,
   customers: CustomerView[],
   period: YearMonth,
   today: YearMonth,
 ) {
-  const { cellFor: inspectionCell } = buildInspectionGrid(customers, period.year);
-  const { cellFor: billingCell } = buildBillingGrid(customers, period.year, today);
+  const { cellFor: inspectionCell } = buildInspectionGrid(doc, period.year);
+  const { cellFor: billingCell } = buildBillingGrid(doc, period.year, today);
 
   const regular = customers
     .map((c) => inspectionCell(c, period.month, "regular"))
@@ -166,9 +175,58 @@ export function summarizeMonth(
       total: billing.length,
       billed: billing.filter((c) => c.isBilled).length,
       amount: billing.reduce((s, c) => s + c.amount, 0),
-      billedAmount: billing
-        .filter((c) => c.isBilled)
-        .reduce((s, c) => s + c.amount, 0),
+      billedAmount: billing.filter((c) => c.isBilled).reduce((s, c) => s + c.amount, 0),
     },
   };
+}
+
+export type UnpaidItem = {
+  customer: CustomerView;
+  year: number;
+  month: number;
+  amount: number;
+  expected: YearMonth;
+  billedDate: string | null;
+  overdueDays: number;
+};
+
+/** 予定月の末日を過ぎた日数 */
+function daysSince(expected: YearMonth, now: Date): number {
+  const dueEnd = new Date(expected.year, expected.month, 0, 23, 59, 59);
+  return Math.max(0, Math.floor((now.getTime() - dueEnd.getTime()) / 86_400_000));
+}
+
+/** 未入金アラート。請求済みで入金予定を過ぎたもの */
+export function getUnpaidItems(
+  doc: AppDocument,
+  customers: CustomerView[],
+  now = new Date(),
+): UnpaidItem[] {
+  const byId = new Map(customers.map((c) => [c.id, c]));
+  const today = { year: now.getFullYear(), month: now.getMonth() + 1 };
+
+  return doc.billingRecords
+    .filter((r) => r.isBilled && !r.isPaid)
+    .flatMap((r) => {
+      const customer = byId.get(r.customerId);
+      if (!customer) return [];
+      const expected = {
+        year: r.expectedPaymentYear,
+        month: r.expectedPaymentMonth,
+      };
+      if (!isPaymentOverdue(expected, false, today)) return [];
+
+      return [
+        {
+          customer,
+          year: r.year,
+          month: r.month,
+          amount: r.billingAmount,
+          expected,
+          billedDate: r.billedDate,
+          overdueDays: daysSince(expected, now),
+        },
+      ];
+    })
+    .sort((a, b) => b.overdueDays - a.overdueDays);
 }

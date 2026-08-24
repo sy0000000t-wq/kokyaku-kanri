@@ -29,3 +29,6 @@ next-env.d.ts
 
 # TypeScript のインクリメンタルビルド情報
 *.tsbuildinfo
+
+# 移行用の書き出し（実データを含む）
+/data/移行用データ.json

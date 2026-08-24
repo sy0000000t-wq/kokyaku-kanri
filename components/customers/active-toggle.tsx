@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { setCustomerActive } from "@/app/actions/customer";
+import { useState } from "react";
 import { Button, Input } from "@/components/ui";
+import { useStore } from "@/lib/store/context";
+import { setCustomerActive } from "@/lib/store/mutations";
 import { cn, todayIso } from "@/lib/utils";
 
 /**
- * §5.3 行末の稼働トグル。
+ * 行末の稼働トグル。
  * OFF にするときだけ確認ダイアログを出し、解除日を入力させる。
  */
 export function ActiveToggle({
@@ -18,22 +19,9 @@ export function ActiveToggle({
   name: string;
   isActive: boolean;
 }) {
+  const { update } = useStore();
   const [open, setOpen] = useState(false);
   const [endDate, setEndDate] = useState(todayIso());
-  const [pending, startTransition] = useTransition();
-
-  const turnOn = () => {
-    startTransition(async () => {
-      await setCustomerActive({ id, isActive: true });
-    });
-  };
-
-  const turnOff = () => {
-    startTransition(async () => {
-      await setCustomerActive({ id, isActive: false, contractEndDate: endDate });
-      setOpen(false);
-    });
-  };
 
   return (
     <>
@@ -42,10 +30,13 @@ export function ActiveToggle({
         role="switch"
         aria-checked={isActive}
         aria-label={`${name} の稼働状態`}
-        disabled={pending}
-        onClick={() => (isActive ? setOpen(true) : turnOn())}
+        onClick={() =>
+          isActive
+            ? setOpen(true)
+            : update((doc) => setCustomerActive(doc, { id, isActive: true }))
+        }
         className={cn(
-          "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",
+          "relative h-5 w-9 shrink-0 rounded-full transition-colors",
           isActive ? "bg-ok" : "bg-line",
         )}
       >
@@ -73,7 +64,10 @@ export function ActiveToggle({
               過去の実績・チェックはすべて残ります。
             </p>
 
-            <label className="mt-3 mb-1 block text-xs font-medium text-muted" htmlFor={`end-${id}`}>
+            <label
+              className="mt-3 mb-1 block text-xs font-medium text-muted"
+              htmlFor={`end-${id}`}
+            >
               解除日
             </label>
             <Input
@@ -84,11 +78,23 @@ export function ActiveToggle({
             />
 
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
+              <Button variant="outline" onClick={() => setOpen(false)}>
                 キャンセル
               </Button>
-              <Button variant="danger" onClick={turnOff} disabled={pending}>
-                {pending ? "処理中…" : "解除する"}
+              <Button
+                variant="danger"
+                onClick={() => {
+                  update((doc) =>
+                    setCustomerActive(doc, {
+                      id,
+                      isActive: false,
+                      contractEndDate: endDate,
+                    }),
+                  );
+                  setOpen(false);
+                }}
+              >
+                解除する
               </Button>
             </div>
           </div>

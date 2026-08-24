@@ -11,7 +11,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed:sample": "tsx scripts/seed-sample.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "export:sqlite": "tsx scripts/export-sqlite.ts"
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",

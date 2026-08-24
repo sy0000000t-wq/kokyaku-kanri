@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { useStore } from "@/lib/store/context";
+import { recalcDistance } from "@/lib/store/distance";
 import {
   deleteCustomer,
-  recalcDistanceFor,
+  extractCustomer,
   saveCustomer,
-  type ActionState,
-} from "@/app/actions/customer";
+  type CustomerInput,
+} from "@/lib/store/mutations";
+import { validateCustomer, type ValidationErrors } from "@/lib/store/validation";
+import { downloadFile } from "@/lib/csv";
 import { Badge, Button, buttonClass, Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
 import { roundPoints } from "@/lib/calc/round";
 import {
@@ -22,11 +26,9 @@ import type {
   FacilityFormValue,
   FormMasters,
 } from "@/lib/customer-form-types";
-import { cn, formatKm, formatPoints, formatYen, MONTHS } from "@/lib/utils";
+import { cn, formatKm, formatPoints, formatYen, MONTHS, todayIso } from "@/lib/utils";
 
 export type { CustomerFormValues, FormMasters };
-
-const initialState: ActionState = { status: "idle" };
 
 export function CustomerForm({
   masters,
@@ -36,8 +38,9 @@ export function CustomerForm({
   initial: CustomerFormValues;
 }) {
   const router = useRouter();
-  const [state, formAction, isSaving] = useActionState(saveCustomer, initialState);
-  const errors = state.status === "error" ? state.errors : {};
+  const { doc, update, updateWith } = useStore();
+  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const [facilities, setFacilities] = useState<FacilityFormValue[]>(
     initial.facilities,
@@ -139,23 +142,80 @@ export function CustomerForm({
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty]);
 
-  useEffect(() => {
-    if (state.status === "ok") {
-      setDirty(false);
-      router.push("/customers");
-    }
-  }, [state, router]);
+  /** フォームの入力値を保存用の形にまとめる */
+  const collect = (): CustomerInput => {
+    const toNum = (v: string) => (v.trim() === "" ? null : Number(v));
+    return {
+      id: initial.id,
+      code: fields.code.trim(),
+      name: fields.name.trim(),
+      inspectionCycleId,
+      monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
+      annualFeeHandling,
+      annualInspectionFee:
+        annualFeeHandling === "separate" ? toNum(annualInspectionFee) : null,
+      unitPriceOverride:
+        useUnitPriceOverride && unitPriceOverride !== ""
+          ? Number(unitPriceOverride)
+          : null,
+      address: fields.address.trim(),
+      lat: toNum(fields.lat),
+      lng: toNum(fields.lng),
+      phone: fields.phone,
+      email: fields.email,
+      contactPerson: fields.contactPerson,
+      contractStartDate,
+      contractEndDate: contractEndDate || null,
+      annualInspectionMonth: toNum(fields.annualInspectionMonth),
+      annualInspectionDay: toNum(fields.annualInspectionDay),
+      billingCycleId: toNum(fields.billingCycleId),
+      paymentLagMonths: toNum(fields.paymentLagMonths) ?? 1,
+      isActive: isActive ? 1 : 0,
+      note: fields.note,
+      inspectionMonths: months,
+      facilities: facilities.map((f) => ({
+        id: f.id,
+        categoryId: f.categoryId,
+        categoryCycleId: f.categoryCycleId,
+        capacity: f.capacity === "" ? null : Number(f.capacity),
+        coefficientOverride:
+          f.coefficientMode === "auto" || f.coefficientOverride === ""
+            ? null
+            : Number(f.coefficientOverride),
+        note: f.note,
+      })),
+    };
+  };
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const input = collect();
+    const found = validateCustomer(doc, input);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
+    setIsSaving(true);
+    updateWith((current) => {
+      const { doc: next, customerId } = saveCustomer(current, input);
+      return { doc: next, result: customerId };
+    });
+    setDirty(false);
+    router.push("/customers");
+  };
 
   const runRecalc = () => {
     if (!initial.id) return;
     setDistanceMessage(null);
     startRecalc(async () => {
-      const r = await recalcDistanceFor(initial.id!);
+      const customer = doc.customers.find((c) => c.id === initial.id);
+      if (!customer) return;
+      const r = await recalcDistance(doc, customer);
       if (r.ok) {
+        update(() => r.doc);
         setDistance({ km: r.distanceKm, min: null, method: r.method });
         setDistanceMessage(`更新しました（${r.method === "road" ? "道路距離" : "直線距離"}）`);
       } else {
-        setDistanceMessage(r.message ?? "距離を取得できませんでした");
+        setDistanceMessage(r.message);
       }
     });
   };
@@ -168,26 +228,7 @@ export function CustomerForm({
     ) : null;
 
   return (
-    <form action={formAction} onChange={() => setDirty(true)} className="space-y-4">
-      <input type="hidden" name="id" value={initial.id ?? ""} />
-      <input type="hidden" name="isActive" value={isActive ? "1" : "0"} />
-      {/* 設備は行数が可変なので JSON でまとめて送る */}
-      <input
-        type="hidden"
-        name="facilities"
-        value={JSON.stringify(
-          facilities.map((f) => ({
-            id: f.id,
-            categoryId: f.categoryId,
-            categoryCycleId: f.categoryCycleId,
-            capacity: f.capacity,
-            coefficientOverride:
-              f.coefficientMode === "auto" ? "" : f.coefficientOverride,
-            note: f.note,
-          })),
-        )}
-      />
-
+    <form onSubmit={submit} onChange={() => setDirty(true)} className="space-y-4">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
           {/* 1. 基本情報 */}
@@ -575,9 +616,9 @@ export function CustomerForm({
             {initial.id && <DeleteButton id={initial.id} name={initial.name} />}
           </div>
 
-          {state.status === "error" && (
+          {Object.keys(errors).length > 0 && (
             <p className="mt-2 text-xs text-danger" role="alert">
-              {state.message}
+              入力内容を確認してください
             </p>
           )}
         </div>
@@ -603,11 +644,11 @@ function Row({
   );
 }
 
-/** §6 完全削除は二段階確認 */
+/** 完全削除は二段階確認 */
 function DeleteButton({ id, name }: { id: number; name: string }) {
   const router = useRouter();
+  const { doc, update } = useStore();
   const [step, setStep] = useState(0);
-  const [pending, startTransition] = useTransition();
 
   if (step === 0) {
     return (
@@ -623,7 +664,8 @@ function DeleteButton({ id, name }: { id: number; name: string }) {
         {name} と、その点検・請求実績をすべて削除します。
       </p>
       <p className="mt-1 text-muted">
-        通常は稼働トグルで「解除」してください。削除前に data/deleted/ へ JSON を退避します。
+        通常は稼働トグルで「解除」してください。削除の直前に、この顧客の分だけを
+        JSON ファイルとして書き出します。
       </p>
       <div className="mt-2 flex gap-2">
         <Button type="button" variant="outline" size="sm" onClick={() => setStep(0)}>
@@ -633,15 +675,19 @@ function DeleteButton({ id, name }: { id: number; name: string }) {
           type="button"
           variant="danger"
           size="sm"
-          disabled={pending}
-          onClick={() =>
-            startTransition(async () => {
-              await deleteCustomer(id);
-              router.push("/customers");
-            })
-          }
+          onClick={() => {
+            // 消す前に手元へ退避する
+            const snapshot = extractCustomer(doc, id);
+            downloadFile(
+              `削除退避_${snapshot.customer?.code ?? id}_${todayIso()}.json`,
+              JSON.stringify(snapshot, null, 2),
+              "application/json",
+            );
+            update((current) => deleteCustomer(current, id));
+            router.push("/customers");
+          }}
         >
-          {pending ? "削除中…" : "完全に削除する"}
+          完全に削除する
         </Button>
       </div>
     </div>

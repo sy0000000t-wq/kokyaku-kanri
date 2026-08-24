@@ -1,11 +1,11 @@
-import "server-only";
 import type { FormMasters } from "@/lib/customer-form-types";
-import { getMasters, type Masters } from "@/lib/queries";
+import type { AppDocument } from "./document";
+import type { Indexes } from "./selectors";
 
-/** サーバー側のマスタをクライアントフォームに渡せる形へ落とす */
-export function toFormMasters(masters: Masters = getMasters()): FormMasters {
+/** 文書を顧客フォームが使う形へ落とす */
+export function toFormMasters(doc: AppDocument, indexes: Indexes): FormMasters {
   const coefficientRows: FormMasters["coefficientRows"] = {};
-  for (const [tableId, rows] of masters.coefficientRowsByTable) {
+  for (const [tableId, rows] of indexes.coefficientRowsByTable) {
     coefficientRows[tableId] = rows.map((r) => ({
       minCapacity: r.minCapacity,
       maxCapacity: r.maxCapacity,
@@ -14,7 +14,7 @@ export function toFormMasters(masters: Masters = getMasters()): FormMasters {
   }
 
   return {
-    categories: masters.equipmentCategories
+    categories: doc.equipmentCategories
       .filter((c) => c.isActive)
       .map((c) => ({
         id: c.id,
@@ -26,7 +26,7 @@ export function toFormMasters(masters: Masters = getMasters()): FormMasters {
         minCapacity: c.minCapacity,
         maxCapacity: c.maxCapacity,
         note: c.note,
-        cycles: (masters.categoryCyclesByCategory.get(c.id) ?? []).map((cy) => ({
+        cycles: (indexes.categoryCyclesByCategory.get(c.id) ?? []).map((cy) => ({
           id: cy.id,
           name: cy.name,
           intervalMonths: cy.intervalMonths,
@@ -36,13 +36,13 @@ export function toFormMasters(masters: Masters = getMasters()): FormMasters {
           conditionNote: cy.conditionNote,
         })),
       })),
-    inspectionCycles: masters.inspectionCycles
+    inspectionCycles: doc.inspectionCycles
       .filter((c) => c.isActive)
       .map((c) => ({ id: c.id, name: c.name, intervalMonths: c.intervalMonths })),
-    billingCycles: masters.billingCycles
+    billingCycles: doc.billingCycles
       .filter((b) => b.isActive)
       .map((b) => ({ id: b.id, name: b.name, intervalMonths: b.intervalMonths })),
     coefficientRows,
-    taxRate: masters.settings.taxRate,
+    taxRate: doc.settings.taxRate,
   };
 }

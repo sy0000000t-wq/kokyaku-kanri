@@ -41,10 +41,14 @@ export function Button({
 
 export function Input({
   className,
+  ref,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement>) {
+}: React.InputHTMLAttributes<HTMLInputElement> & {
+  ref?: React.Ref<HTMLInputElement>;
+}) {
   return (
     <input
+      ref={ref}
       className={cn(
         "h-9 w-full rounded-md border border-line bg-surface px-2.5 text-sm",
         "focus-visible:outline-2 focus-visible:outline-offset-[-1px] focus-visible:outline-brand",

@@ -1,27 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
-import {
-  saveBillingCycle,
-  saveInspectionCycle,
-  type SettingsState,
-} from "@/app/actions/settings";
+import { useState } from "react";
 import { Button, Card, CardHeader, Input, Select } from "@/components/ui";
-import type { BillingCycle, InspectionCycle } from "@/db/schema";
-
-const initial: SettingsState = { status: "idle" };
-
-function StatusText({ state }: { state: SettingsState }) {
-  if (state.status === "idle") return null;
-  return (
-    <p
-      className={state.status === "ok" ? "text-xs text-ok" : "text-xs text-danger"}
-      role="status"
-    >
-      {state.message}
-    </p>
-  );
-}
+import { useStore } from "@/lib/store/context";
+import type { BillingCycle, InspectionCycle } from "@/lib/store/document";
+import { saveBillingCycle, saveInspectionCycle } from "@/lib/store/mutations";
 
 /** 見出し行と入力行で同じグリッド定義を使い、列を揃える */
 function HeaderRow({ cols, labels }: { cols: string; labels: string[] }) {
@@ -96,36 +79,80 @@ function CycleRow({
   kind: "inspection" | "billing";
   sortOrder?: number;
 }) {
-  const [state, action, pending] = useActionState(
-    kind === "inspection" ? saveInspectionCycle : saveBillingCycle,
-    initial,
+  const { update } = useStore();
+  const [name, setName] = useState(row?.name ?? "");
+  const [intervalMonths, setIntervalMonths] = useState(
+    String(row?.intervalMonths ?? 1),
   );
+  const [order, setOrder] = useState(String(row?.sortOrder ?? sortOrder ?? 0));
+  const [isActive, setIsActive] = useState(String(row?.isActive ?? 1));
+  const [error, setError] = useState<string | null>(null);
+
   const cols = kind === "inspection" ? INSPECTION_COLS : BILLING_COLS;
 
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const interval = Number(intervalMonths);
+    if (!name.trim()) return setError("表示名は必須です");
+    if (!Number.isFinite(interval) || interval < 0) {
+      return setError("実施間隔は 0 以上の整数で入力してください");
+    }
+
+    const values = {
+      id: row?.id ?? null,
+      name: name.trim(),
+      intervalMonths: interval,
+      sortOrder: Number(order) || 0,
+      isActive: isActive === "0" ? 0 : 1,
+    };
+
+    update((doc) =>
+      kind === "inspection"
+        ? saveInspectionCycle(doc, values)
+        : saveBillingCycle(doc, values),
+    );
+
+    if (!row) {
+      setName("");
+      setIntervalMonths("1");
+    }
+  };
+
   return (
-    <form action={action} className="border-b border-line last:border-0">
+    <form onSubmit={submit} className="border-b border-line last:border-0">
       <div className={`grid ${cols} items-center gap-2 px-4 py-2`}>
-        <input type="hidden" name="id" value={row?.id ?? ""} />
-        <Input name="name" defaultValue={row?.name ?? ""} placeholder="新しい周期" />
         <Input
-          name="intervalMonths"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="新しい周期"
+        />
+        <Input
           type="number"
           min="0"
           max="12"
-          defaultValue={row?.intervalMonths ?? 1}
+          value={intervalMonths}
+          onChange={(e) => setIntervalMonths(e.target.value)}
         />
-        <Input name="sortOrder" type="number" defaultValue={row?.sortOrder ?? sortOrder ?? 0} />
-        <Select name="isActive" defaultValue={row?.isActive ?? 1}>
+        <Input
+          type="number"
+          value={order}
+          onChange={(e) => setOrder(e.target.value)}
+        />
+        <Select value={isActive} onChange={(e) => setIsActive(e.target.value)}>
           <option value="1">有効</option>
           <option value="0">無効</option>
         </Select>
-        <Button type="submit" size="sm" variant="outline" disabled={pending}>
+        <Button type="submit" size="sm" variant="outline">
           {row ? "更新" : "＋ 追加"}
         </Button>
       </div>
-      <div className="px-4 pb-1.5">
-        <StatusText state={state} />
-      </div>
+      {error && (
+        <p className="px-4 pb-1.5 text-xs text-danger" role="alert">
+          {error}
+        </p>
+      )}
     </form>
   );
 }

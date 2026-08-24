@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { MainNav } from "@/components/main-nav";
 import { ToastProvider } from "@/components/toast";
+import { StoreProvider } from "@/lib/store/context";
+import { StoreStatusBar } from "@/components/store-status-bar";
 
 export const metadata: Metadata = {
   title: "顧客管理 | 電気保安管理",
@@ -21,12 +23,15 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className="min-h-dvh">
-        <ToastProvider>
-          <MainNav />
-          <main className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-5 sm:py-6">
-            {children}
-          </main>
-        </ToastProvider>
+        <StoreProvider>
+          <ToastProvider>
+            <MainNav />
+            <StoreStatusBar />
+            <main className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-5 sm:py-6">
+              {children}
+            </main>
+          </ToastProvider>
+        </StoreProvider>
       </body>
     </html>
   );

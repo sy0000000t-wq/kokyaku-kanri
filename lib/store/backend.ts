@@ -1,4 +1,5 @@
 import type { AppDocument } from "./document";
+import { parseDocument } from "./seed";
 
 /**
  * 文書の保存先。
@@ -42,7 +43,6 @@ export class LocalStorageBackend implements DocumentBackend {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
 
-    const { parseDocument } = await import("./seed");
     return {
       doc: parseDocument(JSON.parse(raw)),
       revision: window.localStorage.getItem(REVISION_KEY),

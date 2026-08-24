@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { saveCoefficientRows } from "@/app/actions/settings";
+import { useMemo, useState } from "react";
 import { Badge, Button, Card, CardHeader, Input, Select } from "@/components/ui";
 import { validateCoefficientRanges } from "@/lib/calc/coefficient-range";
-import type { CoefficientRow, CoefficientTable } from "@/db/schema";
+import { useStore } from "@/lib/store/context";
+import type { CoefficientRow, CoefficientTable } from "@/lib/store/document";
+import { saveCoefficientRows } from "@/lib/store/mutations";
 import { cn } from "@/lib/utils";
 
 type EditableRow = {
@@ -30,10 +31,10 @@ export function CoefficientEditor({
   tables: CoefficientTable[];
   rowsByTable: Record<number, CoefficientRow[]>;
 }) {
+  const { update: saveToStore } = useStore();
   const [tableId, setTableId] = useState(tables[0]?.id ?? 0);
   const [rows, setRows] = useState<EditableRow[]>(toEditable(rowsByTable[tableId] ?? []));
   const [message, setMessage] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
 
   const selectTable = (id: number) => {
     setTableId(id);
@@ -59,10 +60,12 @@ export function CoefficientEditor({
 
   const save = () => {
     setMessage(null);
-    startTransition(async () => {
-      const r = await saveCoefficientRows({ tableId, rows: parsed });
-      setMessage(r.ok ? "保存しました" : "エラーがあるため保存できませんでした");
-    });
+    if (hasError) {
+      setMessage("エラーがあるため保存できませんでした");
+      return;
+    }
+    saveToStore((doc) => saveCoefficientRows(doc, tableId, parsed));
+    setMessage("保存しました");
   };
 
   const table = tables.find((t) => t.id === tableId);
@@ -157,8 +160,8 @@ export function CoefficientEditor({
         >
           ＋ 行を追加
         </Button>
-        <Button type="button" onClick={save} disabled={pending || hasError} size="sm">
-          {pending ? "保存中…" : "このテーブルを保存"}
+        <Button type="button" onClick={save} disabled={hasError} size="sm">
+          このテーブルを保存
         </Button>
         {message && <span className="text-xs text-muted">{message}</span>}
       </div>

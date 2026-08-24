@@ -1,4 +1,4 @@
-import type { CustomerView } from "@/lib/queries";
+import type { CustomerView } from "@/lib/store/selectors";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type SortKey =

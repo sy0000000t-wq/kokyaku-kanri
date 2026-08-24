@@ -1,23 +1,36 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { useParams } from "next/navigation";
 import { CustomerForm } from "@/components/customers/customer-form";
-import { Badge } from "@/components/ui";
-import { toFormMasters } from "@/lib/form-masters";
-import { getCustomerView } from "@/lib/queries";
+import { Badge, Card, EmptyState } from "@/components/ui";
+import { useStore } from "@/lib/store/context";
+import { toFormMasters } from "@/lib/store/form-masters";
+import { getCustomerView } from "@/lib/store/selectors";
 import { formatDate } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
+export default function EditCustomerPage() {
+  const params = useParams<{ id: string }>();
+  const { doc, indexes, status } = useStore();
 
-export default async function EditCustomerPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const customer = getCustomerView(Number(id));
-  if (!customer) notFound();
+  const customer = getCustomerView(doc, indexes, Number(params.id));
 
-  const masters = toFormMasters();
+  if (!customer) {
+    return (
+      <Card>
+        <EmptyState>
+          {status === "loading"
+            ? "読み込んでいます…"
+            : "この顧客は見つかりませんでした。"}
+          <Link href="/customers" className="ml-1 text-brand underline">
+            顧客マスタへ
+          </Link>
+        </EmptyState>
+      </Card>
+    );
+  }
+
+  const masters = toFormMasters(doc, indexes);
 
   return (
     <div className="space-y-4">
@@ -30,7 +43,8 @@ export default async function EditCustomerPage({
           {customer.name}
           {!customer.isActive && (
             <Badge tone="neutral">
-              解除{customer.contractEndDate ? `（${formatDate(customer.contractEndDate)}）` : ""}
+              解除
+              {customer.contractEndDate ? `（${formatDate(customer.contractEndDate)}）` : ""}
             </Badge>
           )}
         </h1>

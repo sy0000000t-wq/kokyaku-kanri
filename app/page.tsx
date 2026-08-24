@@ -1,11 +1,16 @@
+"use client";
+
+import { Suspense } from "react";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { InspectionCheck } from "@/components/schedule/inspection-check";
 import { PeriodNav } from "@/components/period-nav";
 import { Badge, Card, CardHeader, EmptyState, Progress } from "@/components/ui";
-import { summarizeMonth } from "@/lib/monthly";
+import { useStore } from "@/lib/store/context";
+import { getUnpaidItems, summarizeMonth } from "@/lib/store/monthly";
+import { getCustomerViews } from "@/lib/store/selectors";
 import { resolvePeriod } from "@/lib/period";
-import { getCustomerViews } from "@/lib/queries";
-import { getUnpaidItems } from "@/lib/unpaid";
 import {
   cn,
   formatKm,
@@ -15,21 +20,20 @@ import {
   telHref,
 } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
+function DashboardPageInner() {
+  const params = useSearchParams();
+  const { doc, indexes } = useStore();
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | undefined>>;
-}) {
-  const sp = await searchParams;
-  const period = resolvePeriod(sp);
+  const period = resolvePeriod({
+    y: params.get("y") ?? undefined,
+    m: params.get("m") ?? undefined,
+  });
   const now = new Date();
   const today = { year: now.getFullYear(), month: now.getMonth() + 1 };
 
-  const customers = getCustomerViews().filter((c) => c.isActive);
-  const summary = summarizeMonth(customers, period, today);
-  const unpaid = getUnpaidItems(customers, now);
+  const customers = getCustomerViews(doc, indexes).filter((c) => c.isActive);
+  const summary = summarizeMonth(doc, customers, period, today);
+  const unpaid = getUnpaidItems(doc, customers, now);
   const unpaidTotal = unpaid.reduce((s, u) => s + u.amount, 0);
 
   // 当月の点検対象を距離順にまとめる
@@ -226,5 +230,17 @@ function SummaryCard({
         )}
       </Card>
     </Link>
+  );
+}
+
+/**
+ * useSearchParams はレンダリング境界を要求するため Suspense で包む。
+ * 中身はブラウザ側で描画される。
+ */
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-sm text-muted">読み込んでいます…</p>}>
+      <DashboardPageInner />
+    </Suspense>
   );
 }

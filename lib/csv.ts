@@ -13,11 +13,16 @@ export function toCsv(headers: string[], rows: unknown[][]): string {
   return BOM + lines.join("\r\n");
 }
 
-export function csvResponse(filename: string, body: string): Response {
-  return new Response(body, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-    },
-  });
+/** ブラウザから CSV / JSON をダウンロードさせる */
+export function downloadFile(filename: string, body: string, mime: string) {
+  const blob = new Blob([body], { type: `${mime};charset=utf-8` });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // 直後に revoke すると Safari で落ちることがあるので少し待つ
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

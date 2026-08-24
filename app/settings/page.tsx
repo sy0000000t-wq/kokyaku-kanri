@@ -1,20 +1,20 @@
+"use client";
+
+import { Suspense } from "react";
+
 import Link from "next/link";
-import { getBackupList } from "@/app/actions/data";
+import { useSearchParams } from "next/navigation";
 import { BasicSettings } from "@/components/settings/basic-settings";
+import { CategoryEditor } from "@/components/settings/category-editor";
 import { CoefficientEditor } from "@/components/settings/coefficient-editor";
 import { DataManagement } from "@/components/settings/data-management";
 import {
   BillingCycleEditor,
   InspectionCycleEditor,
 } from "@/components/settings/master-editors";
-import { CategoryEditor } from "@/components/settings/category-editor";
-import { DB_PATH } from "@/db";
-import type { CategoryCycle, CoefficientRow } from "@/db/schema";
-import { resolveApiKey } from "@/lib/geo";
-import { getMasters } from "@/lib/queries";
+import { useStore } from "@/lib/store/context";
+import type { CategoryCycle } from "@/lib/store/document";
 import { cn } from "@/lib/utils";
-
-export const dynamic = "force-dynamic";
 
 const TABS = [
   { id: "basic", label: "基本設定" },
@@ -25,24 +25,17 @@ const TABS = [
   { id: "data", label: "データ管理" },
 ] as const;
 
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | undefined>>;
-}) {
-  const sp = await searchParams;
-  const tab = TABS.some((t) => t.id === sp.tab) ? sp.tab! : "basic";
+function SettingsPageInner() {
+  const params = useSearchParams();
+  const { doc, indexes } = useStore();
 
-  const masters = getMasters();
-  const rowsByTable: Record<number, CoefficientRow[]> = {};
-  for (const [id, rows] of masters.coefficientRowsByTable) rowsByTable[id] = rows;
+  const requested = params.get("tab");
+  const tab = TABS.some((t) => t.id === requested) ? requested! : "basic";
 
-  const cyclesByCategory: Record<number, CategoryCycle[]> = {};
-  for (const [id, cycles] of masters.categoryCyclesByCategory)
-    cyclesByCategory[id] = cycles;
-
-  const hasEnvApiKey = !!process.env.GOOGLE_MAPS_API_KEY?.trim();
-  const backups = tab === "data" ? await getBackupList() : [];
+  const rowsByTable = Object.fromEntries(indexes.coefficientRowsByTable);
+  const cyclesByCategory: Record<number, CategoryCycle[]> = Object.fromEntries(
+    indexes.categoryCyclesByCategory,
+  );
 
   return (
     <div className="space-y-4">
@@ -71,35 +64,35 @@ export default async function SettingsPage({
         ))}
       </nav>
 
-      {tab === "basic" && (
-        <BasicSettings settings={masters.settings} hasEnvApiKey={hasEnvApiKey} />
-      )}
+      {tab === "basic" && <BasicSettings settings={doc.settings} />}
       {tab === "facility" && (
         <CategoryEditor
-          categories={masters.equipmentCategories}
+          categories={doc.equipmentCategories}
           cyclesByCategory={cyclesByCategory}
-          coefficientTables={masters.coefficientTables}
+          coefficientTables={doc.coefficientTables}
         />
       )}
-      {tab === "cycle" && <InspectionCycleEditor cycles={masters.inspectionCycles} />}
-      {tab === "billing" && <BillingCycleEditor cycles={masters.billingCycles} />}
+      {tab === "cycle" && <InspectionCycleEditor cycles={doc.inspectionCycles} />}
+      {tab === "billing" && <BillingCycleEditor cycles={doc.billingCycles} />}
       {tab === "coefficient" && (
-        <CoefficientEditor tables={masters.coefficientTables} rowsByTable={rowsByTable} />
+        <CoefficientEditor
+          tables={doc.coefficientTables}
+          rowsByTable={rowsByTable}
+        />
       )}
-      {tab === "data" && <DataManagement backups={backups} dbPath={DB_PATH} />}
-
-      {tab === "basic" && (
-        <p className="text-xs text-muted">
-          現在の距離算出：
-          {resolveApiKey(masters.settings)
-            ? masters.settings.distanceMode === "straight"
-              ? "直線距離（設定で固定）"
-              : "道路距離（Google API）"
-            : masters.settings.distanceMode === "road"
-              ? "道路距離を選択中ですが API キーがありません"
-              : "直線距離（OpenStreetMap Nominatim）"}
-        </p>
-      )}
+      {tab === "data" && <DataManagement />}
     </div>
+  );
+}
+
+/**
+ * useSearchParams はレンダリング境界を要求するため Suspense で包む。
+ * 中身はブラウザ側で描画される。
+ */
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-sm text-muted">読み込んでいます…</p>}>
+      <SettingsPageInner />
+    </Suspense>
   );
 }

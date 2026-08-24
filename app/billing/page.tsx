@@ -1,4 +1,9 @@
+"use client";
+
+import { Suspense } from "react";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   BilledCheck,
   BillingAmount,
@@ -8,9 +13,10 @@ import {
 import { PeriodNav } from "@/components/period-nav";
 import { ScopeFilter } from "@/components/scope-filter";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
-import { buildBillingGrid } from "@/lib/monthly";
+import { useStore } from "@/lib/store/context";
+import { buildBillingGrid } from "@/lib/store/monthly";
+import { getCustomerViews } from "@/lib/store/selectors";
 import { resolvePeriod } from "@/lib/period";
-import { getCustomerViews } from "@/lib/queries";
 import {
   cn,
   formatDate,
@@ -19,24 +25,21 @@ import {
   MONTHS,
 } from "@/lib/utils";
 
-export const dynamic = "force-dynamic";
-
 type SP = Record<string, string | undefined>;
 
-export default async function BillingPage({
-  searchParams,
-}: {
-  searchParams: Promise<SP>;
-}) {
-  const sp = await searchParams;
+function BillingPageInner() {
+  const params = useSearchParams();
+  const { doc, indexes } = useStore();
+
+  const sp: SP = Object.fromEntries(params.entries());
   const period = resolvePeriod(sp);
   const now = new Date();
   const today = { year: now.getFullYear(), month: now.getMonth() + 1 };
   const showAll = sp.active === "all";
   const quick = sp.q === "unbilled" || sp.q === "unpaid" ? sp.q : "all";
 
-  const rows = getCustomerViews().filter((c) => showAll || c.isActive);
-  const { cellFor } = buildBillingGrid(rows, period.year, today);
+  const rows = getCustomerViews(doc, indexes).filter((c) => showAll || c.isActive);
+  const { cellFor } = buildBillingGrid(doc, period.year, today);
 
   const monthCells = rows
     .map((c) => cellFor(c, period.month))
@@ -56,7 +59,7 @@ export default async function BillingPage({
   // 今月に入金予定のセルは、年をまたぐ場合があるので前年分も見る
   const paymentCells = [period.year - 1, period.year]
     .flatMap((y) => {
-      const grid = buildBillingGrid(rows, y, today);
+      const grid = buildBillingGrid(doc, y, today);
       return rows.flatMap((c) =>
         MONTHS.map((m) => grid.cellFor(c, m)).filter(
           (cell) =>
@@ -72,7 +75,7 @@ export default async function BillingPage({
 
   const overdueCells = [period.year - 1, period.year]
     .flatMap((y) => {
-      const grid = buildBillingGrid(rows, y, today);
+      const grid = buildBillingGrid(doc, y, today);
       return rows.flatMap((c) => MONTHS.map((m) => grid.cellFor(c, m)));
     })
     .filter((cell) => cell.isTarget && cell.isOverdue);
@@ -360,5 +363,17 @@ function SumRow({
         <span className="ml-1 text-xs text-muted">（{count} 件）</span>
       </dd>
     </div>
+  );
+}
+
+/**
+ * useSearchParams はレンダリング境界を要求するため Suspense で包む。
+ * 中身はブラウザ側で描画される。
+ */
+export default function BillingPage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-sm text-muted">読み込んでいます…</p>}>
+      <BillingPageInner />
+    </Suspense>
   );
 }

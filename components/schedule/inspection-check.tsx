@@ -1,13 +1,12 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
-import { setInspectionDone } from "@/app/actions/inspection";
-import { useToast } from "@/components/toast";
+import { useStore } from "@/lib/store/context";
+import { setInspectionDone } from "@/lib/store/mutations";
 import { cn } from "@/lib/utils";
 
 /**
- * §10-6 1クリックで完結。useOptimistic で即時反映し、
- * 失敗したらロールバックしてトーストを出す。
+ * 点検の実施チェック。1クリックで確定する。
+ * 文書はその場で書き換わり、保存は少し待ってからまとめて行われる。
  */
 export function InspectionCheck({
   customerId,
@@ -28,24 +27,8 @@ export function InspectionCheck({
   disabled?: boolean;
   label?: string;
 }) {
-  const toast = useToast();
-  const [optimistic, setOptimistic] = useOptimistic(isDone);
-  const [, startTransition] = useTransition();
-
+  const { update } = useStore();
   const typeLabel = type === "regular" ? "通常点検" : "年次点検";
-
-  const toggle = () => {
-    const next = !optimistic;
-    startTransition(async () => {
-      setOptimistic(next);
-      try {
-        await setInspectionDone({ customerId, year, month, type, isDone: next });
-      } catch {
-        // useOptimistic はトランジション終了時に自動で元へ戻る
-        toast(`${customerName} の${typeLabel}を更新できませんでした`, "danger");
-      }
-    });
-  };
 
   return (
     <label
@@ -57,9 +40,19 @@ export function InspectionCheck({
       <input
         type="checkbox"
         className="size-4 accent-[oklch(0.55_0.14_155)]"
-        checked={optimistic}
+        checked={isDone}
         disabled={disabled}
-        onChange={toggle}
+        onChange={(e) =>
+          update((doc) =>
+            setInspectionDone(doc, {
+              customerId,
+              year,
+              month,
+              type,
+              isDone: e.target.checked,
+            }),
+          )
+        }
         aria-label={`${customerName} ${year}年${month}月の${typeLabel} 実施済み`}
       />
       {label && <span className="text-xs">{label}</span>}

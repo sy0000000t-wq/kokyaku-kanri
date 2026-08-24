@@ -1,14 +1,21 @@
+"use client";
+
+import { Suspense } from "react";
+
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CustomerFilters } from "@/components/customers/customer-filters";
 import { ActiveToggle } from "@/components/customers/active-toggle";
 import { RecalcDistancesButton } from "@/components/customers/recalc-distances-button";
 import { Badge, buttonClass, Card, EmptyState } from "@/components/ui";
+import { CustomerCsvButton } from "@/components/customers/customer-csv-button";
 import {
   applyCustomerFilters,
   parseCustomerFilters,
   type SortKey,
 } from "@/lib/customer-filter";
-import { getCustomerViews, getMasters, summarizeCustomers } from "@/lib/queries";
+import { useStore } from "@/lib/store/context";
+import { getCustomerViews, summarizeCustomers } from "@/lib/store/selectors";
 import {
   cn,
   formatDate,
@@ -18,8 +25,6 @@ import {
   splitPhones,
   summarizeFacility,
 } from "@/lib/utils";
-
-export const dynamic = "force-dynamic";
 
 type SP = Record<string, string | undefined>;
 
@@ -56,22 +61,16 @@ function SortLink({
   );
 }
 
-export default async function CustomersPage({
-  searchParams,
-}: {
-  searchParams: Promise<SP>;
-}) {
-  const sp = await searchParams;
+function CustomersPageInner() {
+  const params = useSearchParams();
+  const { doc, indexes } = useStore();
+
+  const sp: SP = Object.fromEntries(params.entries());
   const filters = parseCustomerFilters(sp);
-  const masters = getMasters();
-  const all = getCustomerViews();
+  const all = getCustomerViews(doc, indexes);
   const rows = applyCustomerFilters(all, filters);
   // §5.3 集計は常に稼働中の行を対象にする
   const summary = summarizeCustomers(all);
-
-  const csvParams = new URLSearchParams(
-    Object.entries(sp).filter(([, v]) => v) as [string, string][],
-  );
 
   return (
     <div className="space-y-4">
@@ -84,12 +83,7 @@ export default async function CustomersPage({
         </div>
         <div className="flex items-center gap-2">
           <RecalcDistancesButton />
-          <a
-            href={`/api/export/customers?${csvParams.toString()}`}
-            className={buttonClass("outline", "sm")}
-          >
-            CSV エクスポート
-          </a>
+          <CustomerCsvButton rows={rows} />
           <Link href="/customers/new" className={buttonClass("default", "sm")}>
             ＋ 新規登録
           </Link>
@@ -98,8 +92,8 @@ export default async function CustomersPage({
 
       <Card className="overflow-hidden">
         <CustomerFilters
-          categories={masters.equipmentCategories}
-          inspectionCycles={masters.inspectionCycles}
+          categories={doc.equipmentCategories}
+          inspectionCycles={doc.inspectionCycles}
         />
 
         {rows.length === 0 ? (
@@ -270,5 +264,17 @@ export default async function CustomersPage({
         )}
       </Card>
     </div>
+  );
+}
+
+/**
+ * useSearchParams はレンダリング境界を要求するため Suspense で包む。
+ * 中身はブラウザ側で描画される。
+ */
+export default function CustomersPage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-sm text-muted">読み込んでいます…</p>}>
+      <CustomersPageInner />
+    </Suspense>
   );
 }
