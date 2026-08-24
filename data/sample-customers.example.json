@@ -2,8 +2,13 @@
   {
     "code": "T01",
     "name": "サンプル工業株式会社",
-    "facilityType": "需要設備",
-    "capacityKva": 210,
+    "facilities": [
+      {
+        "category": "需要設備（高圧・100kVA超過）",
+        "cycle": "2ヶ月に1回",
+        "capacity": 210
+      }
+    ],
     "inspectionCycle": "隔月点検",
     "monthlyFee": 17500,
     "annualFeeHandling": "included",
@@ -19,8 +24,13 @@
   {
     "code": "T02",
     "name": "サンプル製作所 第二工場",
-    "facilityType": "需要設備",
-    "capacityKva": 530,
+    "facilities": [
+      {
+        "category": "需要設備（高圧・100kVA超過）",
+        "cycle": "2ヶ月に1回",
+        "capacity": 530
+      }
+    ],
     "inspectionCycle": "隔月点検",
     "monthlyFee": 14000,
     "annualFeeHandling": "separate",

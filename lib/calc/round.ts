@@ -11,9 +11,13 @@ export function roundTo(value: number, digits = 0): number {
   return Math.round(corrected) / factor;
 }
 
-/** 保安管理点数の表示・保持形式（小数第2位） */
+/**
+ * 保安管理点数の保持形式。
+ * 換算値算出フロー図の参考例が 0.075 点・0.132 点・計 0.555 点と
+ * 小数第3位まで扱っているため、第4位を四捨五入して第3位まで保持する。
+ */
 export function roundPoints(value: number): number {
-  return roundTo(value, 2);
+  return roundTo(value, 3);
 }
 
 /** 金額の表示・保持形式（円・整数） */

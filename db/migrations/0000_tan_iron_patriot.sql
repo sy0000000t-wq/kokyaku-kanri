@@ -24,6 +24,19 @@ CREATE TABLE `billing_records` (
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `billing_records_customer_id_year_month_unique` ON `billing_records` (`customer_id`,`year`,`month`);--> statement-breakpoint
+CREATE TABLE `category_cycles` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`category_id` integer NOT NULL,
+	`name` text NOT NULL,
+	`interval_months` integer NOT NULL,
+	`multiplier` real,
+	`fixed_points` real,
+	`requires_insulation_monitor` integer DEFAULT 0 NOT NULL,
+	`condition_note` text DEFAULT '' NOT NULL,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	FOREIGN KEY (`category_id`) REFERENCES `equipment_categories`(`id`) ON UPDATE no action ON DELETE cascade
+);
+--> statement-breakpoint
 CREATE TABLE `coefficient_rows` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`table_id` integer NOT NULL,
@@ -41,6 +54,20 @@ CREATE TABLE `coefficient_tables` (
 	`note` text DEFAULT '' NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE `customer_facilities` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`customer_id` integer NOT NULL,
+	`category_id` integer NOT NULL,
+	`category_cycle_id` integer NOT NULL,
+	`capacity` real,
+	`coefficient_override` real,
+	`note` text DEFAULT '' NOT NULL,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	FOREIGN KEY (`customer_id`) REFERENCES `customers`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`category_id`) REFERENCES `equipment_categories`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`category_cycle_id`) REFERENCES `category_cycles`(`id`) ON UPDATE no action ON DELETE no action
+);
+--> statement-breakpoint
 CREATE TABLE `customer_inspection_months` (
 	`customer_id` integer NOT NULL,
 	`month` integer NOT NULL,
@@ -52,11 +79,7 @@ CREATE TABLE `customers` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`code` text NOT NULL,
 	`name` text NOT NULL,
-	`facility_type_id` integer NOT NULL,
-	`capacity_kva` real,
-	`capacity_kw` real,
 	`inspection_cycle_id` integer NOT NULL,
-	`coefficient_override` real,
 	`monthly_fee` integer DEFAULT 0 NOT NULL,
 	`annual_fee_handling` text DEFAULT 'included' NOT NULL,
 	`annual_inspection_fee` integer,
@@ -81,30 +104,31 @@ CREATE TABLE `customers` (
 	`note` text DEFAULT '' NOT NULL,
 	`created_at` text DEFAULT (datetime('now')) NOT NULL,
 	`updated_at` text DEFAULT (datetime('now')) NOT NULL,
-	FOREIGN KEY (`facility_type_id`) REFERENCES `facility_types`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`inspection_cycle_id`) REFERENCES `inspection_cycles`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`billing_cycle_id`) REFERENCES `billing_cycles`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE UNIQUE INDEX `customers_code_unique` ON `customers` (`code`);--> statement-breakpoint
-CREATE TABLE `facility_types` (
+CREATE TABLE `equipment_categories` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
-	`capacity_unit` text NOT NULL,
+	`category_group` text DEFAULT 'demand' NOT NULL,
+	`capacity_unit` text DEFAULT 'kVA' NOT NULL,
+	`calculation_method` text DEFAULT 'table' NOT NULL,
 	`coefficient_table_id` integer,
-	`secondary_coefficient_table_id` integer,
+	`min_capacity` real,
+	`max_capacity` real,
+	`note` text DEFAULT '' NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`is_active` integer DEFAULT 1 NOT NULL,
-	FOREIGN KEY (`coefficient_table_id`) REFERENCES `coefficient_tables`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`secondary_coefficient_table_id`) REFERENCES `coefficient_tables`(`id`) ON UPDATE no action ON DELETE no action
+	FOREIGN KEY (`coefficient_table_id`) REFERENCES `coefficient_tables`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `facility_types_name_unique` ON `facility_types` (`name`);--> statement-breakpoint
+CREATE UNIQUE INDEX `equipment_categories_name_unique` ON `equipment_categories` (`name`);--> statement-breakpoint
 CREATE TABLE `inspection_cycles` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`name` text NOT NULL,
 	`interval_months` integer NOT NULL,
-	`coefficient_multiplier` real NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`is_active` integer DEFAULT 1 NOT NULL
 );

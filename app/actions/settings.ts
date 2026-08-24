@@ -84,8 +84,8 @@ export async function geocodeBaseAddress(address: string) {
   }
 }
 
-/** 2. 施設種別マスタ */
-export async function saveFacilityType(
+/** 2. 設備区分マスタ */
+export async function saveEquipmentCategory(
   _prev: SettingsState,
   fd: FormData,
 ): Promise<SettingsState> {
@@ -93,21 +93,116 @@ export async function saveFacilityType(
   const name = str(fd, "name");
   if (!name) return { status: "error", message: "表示名は必須です" };
 
+  const group = str(fd, "categoryGroup");
+  const unit = str(fd, "capacityUnit");
+  const method = str(fd, "calculationMethod");
+
   const values = {
     name,
-    capacityUnit: (str(fd, "capacityUnit") === "kW" ? "kW" : "kVA") as "kVA" | "kW",
+    categoryGroup: (group === "generation" || group === "other"
+      ? group
+      : "demand") as "demand" | "generation" | "other",
+    capacityUnit: (unit === "kW" || unit === "none" ? unit : "kVA") as
+      | "kVA"
+      | "kW"
+      | "none",
+    calculationMethod: (method === "fixed" ? "fixed" : "table") as "table" | "fixed",
     coefficientTableId: num(fd, "coefficientTableId"),
-    secondaryCoefficientTableId: num(fd, "secondaryCoefficientTableId"),
+    minCapacity: num(fd, "minCapacity"),
+    maxCapacity: num(fd, "maxCapacity"),
+    note: str(fd, "note"),
     sortOrder: num(fd, "sortOrder") ?? 0,
     isActive: str(fd, "isActive") === "0" ? 0 : 1,
   };
 
-  if (id) {
-    db.update(schema.facilityTypes).set(values).where(eq(schema.facilityTypes.id, id)).run();
-    return done("施設種別を更新しました");
+  if (values.calculationMethod === "table" && values.coefficientTableId == null) {
+    return {
+      status: "error",
+      message: "係数表方式では換算係数テーブルの指定が必要です",
+    };
   }
-  db.insert(schema.facilityTypes).values(values).run();
-  return done("施設種別を追加しました");
+
+  if (id) {
+    db.update(schema.equipmentCategories)
+      .set(values)
+      .where(eq(schema.equipmentCategories.id, id))
+      .run();
+    return done("設備区分を更新しました");
+  }
+  db.insert(schema.equipmentCategories).values(values).run();
+  return done("設備区分を追加しました");
+}
+
+/** 2-2. 設備区分ごとの点検周期と補正 */
+export async function saveCategoryCycle(
+  _prev: SettingsState,
+  fd: FormData,
+): Promise<SettingsState> {
+  const id = num(fd, "id");
+  const categoryId = num(fd, "categoryId");
+  const name = str(fd, "name");
+  const intervalMonths = num(fd, "intervalMonths");
+  const multiplier = num(fd, "multiplier");
+  const fixedPoints = num(fd, "fixedPoints");
+
+  if (!categoryId) return { status: "error", message: "設備区分が不明です" };
+  if (!name) return { status: "error", message: "周期名は必須です" };
+  if (intervalMonths == null || intervalMonths < 0) {
+    return { status: "error", message: "実施間隔は 0 以上の整数で入力してください" };
+  }
+
+  const category = db
+    .select()
+    .from(schema.equipmentCategories)
+    .where(eq(schema.equipmentCategories.id, categoryId))
+    .get();
+  if (!category) return { status: "error", message: "設備区分が見つかりません" };
+
+  if (category.calculationMethod === "table" && multiplier == null) {
+    return { status: "error", message: "係数表方式では倍率が必要です" };
+  }
+  if (category.calculationMethod === "fixed" && fixedPoints == null) {
+    return { status: "error", message: "固定方式では固定点数が必要です" };
+  }
+
+  const values = {
+    categoryId,
+    name,
+    intervalMonths,
+    multiplier: category.calculationMethod === "table" ? multiplier : null,
+    fixedPoints: category.calculationMethod === "fixed" ? fixedPoints : null,
+    requiresInsulationMonitor: str(fd, "requiresInsulationMonitor") === "on" ? 1 : 0,
+    conditionNote: str(fd, "conditionNote"),
+    sortOrder: num(fd, "sortOrder") ?? 0,
+  };
+
+  if (id) {
+    db.update(schema.categoryCycles)
+      .set(values)
+      .where(eq(schema.categoryCycles.id, id))
+      .run();
+    return done("周期を更新しました");
+  }
+  db.insert(schema.categoryCycles).values(values).run();
+  return done("周期を追加しました");
+}
+
+/** 使われていない周期だけ削除できる */
+export async function deleteCategoryCycle(id: number) {
+  const used = db
+    .select()
+    .from(schema.customerFacilities)
+    .where(eq(schema.customerFacilities.categoryCycleId, id))
+    .get();
+  if (used) {
+    return {
+      ok: false as const,
+      message: "この周期を使っている設備があるため削除できません",
+    };
+  }
+  db.delete(schema.categoryCycles).where(eq(schema.categoryCycles.id, id)).run();
+  revalidatePath("/settings");
+  return { ok: true as const };
 }
 
 /** 3. 点検周期マスタ */

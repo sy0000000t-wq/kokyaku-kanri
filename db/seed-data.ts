@@ -66,42 +66,195 @@ export const seedCoefficientTables = [
   },
 ];
 
-/** §3.3 施設種別マスタ */
-export const seedFacilityTypes = [
+/**
+ * 設備区分マスタ。出典は「換算値算出フロー図（2025-01-09）」。
+ * multiplier は table 方式（係数表 × 倍率）、fixedPoints は fixed 方式（容量によらず固定）。
+ */
+export type SeedCategoryCycle = {
+  name: string;
+  intervalMonths: number;
+  multiplier?: number;
+  fixedPoints?: number;
+  requiresInsulationMonitor?: boolean;
+  conditionNote?: string;
+};
+
+export type SeedEquipmentCategory = {
+  name: string;
+  categoryGroup: "demand" | "generation" | "other";
+  capacityUnit: "kVA" | "kW" | "none";
+  calculationMethod: "table" | "fixed";
+  table?: string | null;
+  minCapacity?: number | null;
+  maxCapacity?: number | null;
+  note?: string;
+  cycles: SeedCategoryCycle[];
+};
+
+export const seedEquipmentCategories: SeedEquipmentCategory[] = [
   {
-    name: "需要設備",
-    capacityUnit: "kVA" as const,
-    table: COEFFICIENT_TABLE_DEMAND,
-    secondaryTable: null,
+    name: "需要設備（低圧）",
+    categoryGroup: "demand",
+    capacityUnit: "none",
+    calculationMethod: "fixed",
+    cycles: [
+      { name: "月1回", intervalMonths: 1, fixedPoints: 0.3 },
+      { name: "2ヶ月に1回", intervalMonths: 2, fixedPoints: 0.18 },
+    ],
   },
   {
-    name: "需要設備＋太陽光",
-    capacityUnit: "kVA" as const,
-    table: COEFFICIENT_TABLE_DEMAND,
-    // kVA 側と kW 側でそれぞれ係数を求めて合算する（§3.3 注記）
-    secondaryTable: COEFFICIENT_TABLE_SOLAR,
+    name: "需要設備（高圧・64kVA未満・小規模高圧設備）",
+    categoryGroup: "demand",
+    capacityUnit: "kVA",
+    calculationMethod: "fixed",
+    maxCapacity: 64,
+    note: "フロー図では ※固定。絶縁監視装置の設置が必須",
+    cycles: [
+      {
+        name: "3ヶ月に1回",
+        intervalMonths: 3,
+        fixedPoints: 0.2,
+        requiresInsulationMonitor: true,
+        conditionNote: "※固定",
+      },
+    ],
   },
   {
-    name: "太陽光",
-    capacityUnit: "kW" as const,
+    name: "需要設備（高圧・64kVA未満・非常用予備発電設備あり）",
+    categoryGroup: "demand",
+    capacityUnit: "kVA",
+    calculationMethod: "fixed",
+    maxCapacity: 64,
+    cycles: [
+      { name: "月1回", intervalMonths: 1, fixedPoints: 0.4 },
+      { name: "2ヶ月に1回", intervalMonths: 2, fixedPoints: 0.24 },
+    ],
+  },
+  {
+    name: "需要設備（高圧・64kVA以上100kVA以下）",
+    categoryGroup: "demand",
+    capacityUnit: "kVA",
+    calculationMethod: "fixed",
+    minCapacity: 64,
+    maxCapacity: 100,
+    cycles: [
+      { name: "月1回", intervalMonths: 1, fixedPoints: 0.6 },
+      {
+        name: "2ヶ月に1回",
+        intervalMonths: 2,
+        fixedPoints: 0.36,
+        conditionNote: "条件適用",
+      },
+      {
+        name: "3ヶ月に1回",
+        intervalMonths: 3,
+        fixedPoints: 0.27,
+        conditionNote: "条件適用",
+      },
+    ],
+  },
+  {
+    name: "需要設備（高圧・100kVA超過）",
+    categoryGroup: "demand",
+    capacityUnit: "kVA",
+    calculationMethod: "table",
+    table: COEFFICIENT_TABLE_DEMAND,
+    minCapacity: 100,
+    cycles: [
+      { name: "月1回", intervalMonths: 1, multiplier: 1.0 },
+      {
+        name: "2ヶ月に1回",
+        intervalMonths: 2,
+        multiplier: 0.6,
+        requiresInsulationMonitor: true,
+        conditionNote: "条件適用",
+      },
+    ],
+  },
+  {
+    name: "EV専用充電設備（1000kVA未満）",
+    categoryGroup: "demand",
+    capacityUnit: "kVA",
+    calculationMethod: "fixed",
+    maxCapacity: 1000,
+    cycles: [
+      { name: "月1回", intervalMonths: 1, fixedPoints: 0.4 },
+      {
+        name: "2ヶ月に1回",
+        intervalMonths: 2,
+        fixedPoints: 0.24,
+        conditionNote: "条件適用",
+      },
+    ],
+  },
+  {
+    name: "火力発電所（ディーゼル・ガスタービン等）",
+    categoryGroup: "generation",
+    capacityUnit: "kW",
+    calculationMethod: "table",
     table: COEFFICIENT_TABLE_SOLAR,
-    secondaryTable: null,
+    cycles: [
+      { name: "月1回", intervalMonths: 1, multiplier: 1.0 },
+      {
+        name: "3ヶ月に1回",
+        intervalMonths: 3,
+        multiplier: 0.45,
+        conditionNote: "条件適用",
+      },
+    ],
+  },
+  {
+    name: "太陽電池発電所（自家消費）",
+    categoryGroup: "generation",
+    capacityUnit: "kW",
+    calculationMethod: "table",
+    table: COEFFICIENT_TABLE_SOLAR,
+    cycles: [{ name: "6ヶ月に1回", intervalMonths: 6, multiplier: 0.25 }],
+  },
+  {
+    name: "太陽電池発電所（全量売電）",
+    categoryGroup: "generation",
+    capacityUnit: "kW",
+    calculationMethod: "table",
+    table: COEFFICIENT_TABLE_SOLAR,
+    cycles: [
+      { name: "2ヶ月に1回", intervalMonths: 2, multiplier: 0.36 },
+      { name: "3ヶ月に1回", intervalMonths: 3, multiplier: 0.33 },
+      { name: "4ヶ月に1回", intervalMonths: 4, multiplier: 0.32 },
+      { name: "6ヶ月に1回", intervalMonths: 6, multiplier: 0.31 },
+    ],
   },
   {
     name: "蓄電所",
-    capacityUnit: "kW" as const,
+    categoryGroup: "generation",
+    capacityUnit: "kW",
+    calculationMethod: "table",
     table: COEFFICIENT_TABLE_SOLAR,
-    secondaryTable: null,
+    note: "換算値算出フロー図に分岐の記載がないため、月1回のみを用意している",
+    cycles: [{ name: "月1回", intervalMonths: 1, multiplier: 1.0 }],
+  },
+  {
+    name: "配電線路のみ",
+    categoryGroup: "other",
+    capacityUnit: "none",
+    calculationMethod: "fixed",
+    cycles: [
+      { name: "（周期によらず固定）", intervalMonths: 1, fixedPoints: 0.1 },
+    ],
   },
 ];
 
-/** §3.4 点検周期マスタ */
+/**
+ * 点検周期マスタ＝現場を訪問する周期。点検月の生成にだけ使う。
+ * 換算係数の補正は設備区分ごとに持つ（seedEquipmentCategories を参照）。
+ */
 export const seedInspectionCycles = [
-  { name: "毎月点検", intervalMonths: 1, coefficientMultiplier: 1.0 },
-  { name: "隔月点検", intervalMonths: 2, coefficientMultiplier: 0.6 },
-  { name: "3ヶ月点検", intervalMonths: 3, coefficientMultiplier: 0.4 },
-  { name: "6ヶ月点検", intervalMonths: 6, coefficientMultiplier: 0.25 },
-  { name: "年1回点検", intervalMonths: 12, coefficientMultiplier: 0.125 },
+  { name: "毎月点検", intervalMonths: 1 },
+  { name: "隔月点検", intervalMonths: 2 },
+  { name: "3ヶ月点検", intervalMonths: 3 },
+  { name: "4ヶ月点検", intervalMonths: 4 },
+  { name: "6ヶ月点検", intervalMonths: 6 },
+  { name: "年1回点検", intervalMonths: 12 },
 ];
 
 /** §3.9 / §7 請求サイクルマスタ */

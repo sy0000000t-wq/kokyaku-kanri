@@ -13,7 +13,8 @@ export type SortDir = "asc" | "desc";
 
 export type CustomerFilterParams = {
   active: ActiveFilter;
-  facilityTypeId: number | null;
+  /** 設備区分。1つでも該当する設備を持つ顧客を残す */
+  categoryId: number | null;
   inspectionCycleId: number | null;
   q: string;
   sort: SortKey;
@@ -39,7 +40,7 @@ export function parseCustomerFilters(
   ];
   return {
     active,
-    facilityTypeId: sp.ft ? Number(sp.ft) || null : null,
+    categoryId: sp.cat ? Number(sp.cat) || null : null,
     inspectionCycleId: sp.cycle ? Number(sp.cycle) || null : null,
     q: (sp.q ?? "").trim(),
     sort: sortKeys.includes(sp.sort as SortKey) ? (sp.sort as SortKey) : "code",
@@ -75,7 +76,8 @@ export function applyCustomerFilters(
   const filtered = views.filter((v) => {
     if (f.active === "active" && !v.isActive) return false;
     if (f.active === "inactive" && v.isActive) return false;
-    if (f.facilityTypeId && v.facilityTypeId !== f.facilityTypeId) return false;
+    if (f.categoryId && !v.facilities.some((x) => x.categoryId === f.categoryId))
+      return false;
     if (f.inspectionCycleId && v.inspectionCycleId !== f.inspectionCycleId) return false;
     if (q) {
       // フリーワードは物件名・住所・担当者を対象にする（§5.3）

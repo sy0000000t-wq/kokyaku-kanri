@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "34f7ccdd-4ab3-4084-94a8-1f79145daac6",
+  "id": "38078771-0ba4-4b85-b538-2cb37bead4f3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "billing_cycles": {
@@ -180,6 +180,96 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "category_cycles": {
+      "name": "category_cycles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "interval_months": {
+          "name": "interval_months",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "multiplier": {
+          "name": "multiplier",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "fixed_points": {
+          "name": "fixed_points",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "requires_insulation_monitor": {
+          "name": "requires_insulation_monitor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "condition_note": {
+          "name": "condition_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "category_cycles_category_id_equipment_categories_id_fk": {
+          "name": "category_cycles_category_id_equipment_categories_id_fk",
+          "tableFrom": "category_cycles",
+          "tableTo": "equipment_categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "coefficient_rows": {
       "name": "coefficient_rows",
       "columns": {
@@ -286,6 +376,114 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "customer_facilities": {
+      "name": "customer_facilities",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_id": {
+          "name": "category_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "category_cycle_id": {
+          "name": "category_cycle_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "capacity": {
+          "name": "capacity",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "coefficient_override": {
+          "name": "coefficient_override",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "customer_facilities_customer_id_customers_id_fk": {
+          "name": "customer_facilities_customer_id_customers_id_fk",
+          "tableFrom": "customer_facilities",
+          "tableTo": "customers",
+          "columnsFrom": [
+            "customer_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "customer_facilities_category_id_equipment_categories_id_fk": {
+          "name": "customer_facilities_category_id_equipment_categories_id_fk",
+          "tableFrom": "customer_facilities",
+          "tableTo": "equipment_categories",
+          "columnsFrom": [
+            "category_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "customer_facilities_category_cycle_id_category_cycles_id_fk": {
+          "name": "customer_facilities_category_cycle_id_category_cycles_id_fk",
+          "tableFrom": "customer_facilities",
+          "tableTo": "category_cycles",
+          "columnsFrom": [
+            "category_cycle_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "customer_inspection_months": {
       "name": "customer_inspection_months",
       "columns": {
@@ -356,39 +554,11 @@
           "notNull": true,
           "autoincrement": false
         },
-        "facility_type_id": {
-          "name": "facility_type_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "capacity_kva": {
-          "name": "capacity_kva",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "capacity_kw": {
-          "name": "capacity_kw",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "inspection_cycle_id": {
           "name": "inspection_cycle_id",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
-        },
-        "coefficient_override": {
-          "name": "coefficient_override",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false,
           "autoincrement": false
         },
         "monthly_fee": {
@@ -581,19 +751,6 @@
         }
       },
       "foreignKeys": {
-        "customers_facility_type_id_facility_types_id_fk": {
-          "name": "customers_facility_type_id_facility_types_id_fk",
-          "tableFrom": "customers",
-          "tableTo": "facility_types",
-          "columnsFrom": [
-            "facility_type_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "customers_inspection_cycle_id_inspection_cycles_id_fk": {
           "name": "customers_inspection_cycle_id_inspection_cycles_id_fk",
           "tableFrom": "customers",
@@ -625,8 +782,8 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "facility_types": {
-      "name": "facility_types",
+    "equipment_categories": {
+      "name": "equipment_categories",
       "columns": {
         "id": {
           "name": "id",
@@ -642,12 +799,29 @@
           "notNull": true,
           "autoincrement": false
         },
+        "category_group": {
+          "name": "category_group",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'demand'"
+        },
         "capacity_unit": {
           "name": "capacity_unit",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false
+          "autoincrement": false,
+          "default": "'kVA'"
+        },
+        "calculation_method": {
+          "name": "calculation_method",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'table'"
         },
         "coefficient_table_id": {
           "name": "coefficient_table_id",
@@ -656,12 +830,27 @@
           "notNull": false,
           "autoincrement": false
         },
-        "secondary_coefficient_table_id": {
-          "name": "secondary_coefficient_table_id",
-          "type": "integer",
+        "min_capacity": {
+          "name": "min_capacity",
+          "type": "real",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "max_capacity": {
+          "name": "max_capacity",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "''"
         },
         "sort_order": {
           "name": "sort_order",
@@ -681,8 +870,8 @@
         }
       },
       "indexes": {
-        "facility_types_name_unique": {
-          "name": "facility_types_name_unique",
+        "equipment_categories_name_unique": {
+          "name": "equipment_categories_name_unique",
           "columns": [
             "name"
           ],
@@ -690,25 +879,12 @@
         }
       },
       "foreignKeys": {
-        "facility_types_coefficient_table_id_coefficient_tables_id_fk": {
-          "name": "facility_types_coefficient_table_id_coefficient_tables_id_fk",
-          "tableFrom": "facility_types",
+        "equipment_categories_coefficient_table_id_coefficient_tables_id_fk": {
+          "name": "equipment_categories_coefficient_table_id_coefficient_tables_id_fk",
+          "tableFrom": "equipment_categories",
           "tableTo": "coefficient_tables",
           "columnsFrom": [
             "coefficient_table_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "facility_types_secondary_coefficient_table_id_coefficient_tables_id_fk": {
-          "name": "facility_types_secondary_coefficient_table_id_coefficient_tables_id_fk",
-          "tableFrom": "facility_types",
-          "tableTo": "coefficient_tables",
-          "columnsFrom": [
-            "secondary_coefficient_table_id"
           ],
           "columnsTo": [
             "id"
@@ -741,13 +917,6 @@
         "interval_months": {
           "name": "interval_months",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "coefficient_multiplier": {
-          "name": "coefficient_multiplier",
-          "type": "real",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false

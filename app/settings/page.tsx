@@ -5,11 +5,11 @@ import { CoefficientEditor } from "@/components/settings/coefficient-editor";
 import { DataManagement } from "@/components/settings/data-management";
 import {
   BillingCycleEditor,
-  FacilityTypeEditor,
   InspectionCycleEditor,
 } from "@/components/settings/master-editors";
+import { CategoryEditor } from "@/components/settings/category-editor";
 import { DB_PATH } from "@/db";
-import type { CoefficientRow } from "@/db/schema";
+import type { CategoryCycle, CoefficientRow } from "@/db/schema";
 import { resolveApiKey } from "@/lib/geo";
 import { getMasters } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -18,8 +18,8 @@ export const dynamic = "force-dynamic";
 
 const TABS = [
   { id: "basic", label: "基本設定" },
-  { id: "facility", label: "施設種別" },
-  { id: "cycle", label: "点検周期" },
+  { id: "facility", label: "設備区分" },
+  { id: "cycle", label: "訪問周期" },
   { id: "billing", label: "請求サイクル" },
   { id: "coefficient", label: "換算係数" },
   { id: "data", label: "データ管理" },
@@ -36,6 +36,10 @@ export default async function SettingsPage({
   const masters = getMasters();
   const rowsByTable: Record<number, CoefficientRow[]> = {};
   for (const [id, rows] of masters.coefficientRowsByTable) rowsByTable[id] = rows;
+
+  const cyclesByCategory: Record<number, CategoryCycle[]> = {};
+  for (const [id, cycles] of masters.categoryCyclesByCategory)
+    cyclesByCategory[id] = cycles;
 
   const hasEnvApiKey = !!process.env.GOOGLE_MAPS_API_KEY?.trim();
   const backups = tab === "data" ? await getBackupList() : [];
@@ -71,8 +75,9 @@ export default async function SettingsPage({
         <BasicSettings settings={masters.settings} hasEnvApiKey={hasEnvApiKey} />
       )}
       {tab === "facility" && (
-        <FacilityTypeEditor
-          facilityTypes={masters.facilityTypes}
+        <CategoryEditor
+          categories={masters.equipmentCategories}
+          cyclesByCategory={cyclesByCategory}
           coefficientTables={masters.coefficientTables}
         />
       )}

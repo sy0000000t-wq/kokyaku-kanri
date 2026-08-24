@@ -39,20 +39,58 @@ export async function nextCustomerCode(): Promise<string> {
   return `T${String(max + 1).padStart(2, "0")}`;
 }
 
+type ParsedFacility = {
+  id: number | null;
+  categoryId: number;
+  categoryCycleId: number;
+  capacity: number | null;
+  coefficientOverride: number | null;
+  note: string;
+};
+
+/**
+ * 設備行はフォームから JSON でまとめて受け取る。
+ * 行数が可変なので、name 属性を並べるより取り回しがよい。
+ */
+function parseFacilities(fd: FormData): ParsedFacility[] {
+  const raw = str(fd, "facilities");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((f) => {
+      const row = f as Record<string, unknown>;
+      const toNum = (v: unknown) => {
+        if (v == null || v === "") return null;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
+      return {
+        id: toNum(row.id),
+        categoryId: toNum(row.categoryId) ?? 0,
+        categoryCycleId: toNum(row.categoryCycleId) ?? 0,
+        capacity: toNum(row.capacity),
+        coefficientOverride: toNum(row.coefficientOverride),
+        note: typeof row.note === "string" ? row.note : "",
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 function validate(fd: FormData, id: number | null) {
   const errors: Record<string, string> = {};
 
   const code = str(fd, "code");
   const name = str(fd, "name");
-  const facilityTypeId = num(fd, "facilityTypeId");
   const inspectionCycleId = num(fd, "inspectionCycleId");
   const monthlyFee = num(fd, "monthlyFee");
   const address = str(fd, "address");
   const contractStartDate = str(fd, "contractStartDate");
   const contractEndDate = str(fd, "contractEndDate");
-  const capacityKva = num(fd, "capacityKva");
-  const capacityKw = num(fd, "capacityKw");
-  const annualFeeHandling = str(fd, "annualFeeHandling") === "separate" ? "separate" : "included";
+  const annualFeeHandling =
+    str(fd, "annualFeeHandling") === "separate" ? "separate" : "included";
   const annualInspectionFee = num(fd, "annualInspectionFee");
 
   if (!code) errors.code = "顧客IDは必須です";
@@ -61,26 +99,46 @@ function validate(fd: FormData, id: number | null) {
     if (dup && dup.id !== id) errors.code = "同じ顧客IDが既に登録されています";
   }
   if (!name) errors.name = "物件名称は必須です";
-  if (!facilityTypeId) errors.facilityTypeId = "施設種別は必須です";
-  if (!inspectionCycleId) errors.inspectionCycleId = "点検周期は必須です";
+  if (!inspectionCycleId) errors.inspectionCycleId = "訪問周期は必須です";
   if (monthlyFee == null) errors.monthlyFee = "月額（税抜）は必須です";
   else if (monthlyFee < 0) errors.monthlyFee = "月額は 0 以上で入力してください";
   if (!address) errors.address = "住所は必須です";
   if (!contractStartDate) errors.contractStartDate = "契約開始日は必須です";
 
-  const facilityType = facilityTypeId
-    ? db.select().from(schema.facilityTypes).all().find((f) => f.id === facilityTypeId)
-    : undefined;
+  const facilities = parseFacilities(fd);
+  if (facilities.length === 0) {
+    errors.facilities = "設備を1つ以上登録してください";
+  } else {
+    const categories = db.select().from(schema.equipmentCategories).all();
+    const cycles = db.select().from(schema.categoryCycles).all();
 
-  if (facilityType) {
-    const needsKva = facilityType.capacityUnit === "kVA";
-    const needsKw =
-      facilityType.capacityUnit === "kW" || facilityType.secondaryCoefficientTableId != null;
-
-    if (needsKva && capacityKva == null) errors.capacityKva = "設備容量（kVA）は必須です";
-    if (needsKw && capacityKw == null) errors.capacityKw = "設備容量（kW）は必須です";
-    if (capacityKva != null && capacityKva < 0) errors.capacityKva = "0 以上で入力してください";
-    if (capacityKw != null && capacityKw < 0) errors.capacityKw = "0 以上で入力してください";
+    for (const [i, f] of facilities.entries()) {
+      const category = categories.find((c) => c.id === f.categoryId);
+      if (!category) {
+        errors.facilities = `設備 ${i + 1}：設備区分を選んでください`;
+        break;
+      }
+      const cycle = cycles.find(
+        (c) => c.id === f.categoryCycleId && c.categoryId === f.categoryId,
+      );
+      if (!cycle) {
+        errors.facilities = `設備 ${i + 1}：点検周期を選んでください`;
+        break;
+      }
+      if (category.capacityUnit !== "none") {
+        // 係数表を引く区分では、容量か換算係数のどちらかが要る
+        const needsCapacity =
+          category.calculationMethod === "table" && f.coefficientOverride == null;
+        if (needsCapacity && f.capacity == null) {
+          errors.facilities = `設備 ${i + 1}：設備容量、または換算係数を入力してください`;
+          break;
+        }
+        if (f.capacity != null && f.capacity < 0) {
+          errors.facilities = `設備 ${i + 1}：設備容量は 0 以上で入力してください`;
+          break;
+        }
+      }
+    }
   }
 
   if (annualFeeHandling === "separate" && annualInspectionFee == null) {
@@ -93,15 +151,11 @@ function validate(fd: FormData, id: number | null) {
 
   return {
     errors,
+    facilities,
     values: {
       code,
       name,
-      facilityTypeId: facilityTypeId!,
-      capacityKva,
-      capacityKw,
       inspectionCycleId: inspectionCycleId!,
-      coefficientOverride:
-        str(fd, "useCoefficientOverride") === "on" ? num(fd, "coefficientOverride") : null,
       monthlyFee: monthlyFee ?? 0,
       annualFeeHandling: annualFeeHandling as "included" | "separate",
       annualInspectionFee: annualFeeHandling === "separate" ? annualInspectionFee : null,
@@ -123,6 +177,29 @@ function validate(fd: FormData, id: number | null) {
       note: str(fd, "note"),
     },
   };
+}
+
+/** 設備は毎回入れ替える（行の増減があるため） */
+function saveFacilities(customerId: number, facilities: ParsedFacility[]) {
+  db.delete(schema.customerFacilities)
+    .where(eq(schema.customerFacilities.customerId, customerId))
+    .run();
+
+  if (facilities.length === 0) return;
+
+  db.insert(schema.customerFacilities)
+    .values(
+      facilities.map((f, i) => ({
+        customerId,
+        categoryId: f.categoryId,
+        categoryCycleId: f.categoryCycleId,
+        capacity: f.capacity,
+        coefficientOverride: f.coefficientOverride,
+        note: f.note,
+        sortOrder: i,
+      })),
+    )
+    .run();
 }
 
 function saveInspectionMonths(customerId: number, fd: FormData) {
@@ -149,7 +226,7 @@ export async function saveCustomer(
   const rawId = Number(fd.get("id"));
   const id = Number.isInteger(rawId) && rawId > 0 ? rawId : null;
 
-  const { errors, values } = validate(fd, id);
+  const { errors, values, facilities } = validate(fd, id);
   if (Object.keys(errors).length > 0) {
     return { status: "error", errors, message: "入力内容を確認してください" };
   }
@@ -178,6 +255,7 @@ export async function saveCustomer(
   }
 
   saveInspectionMonths(customerId, fd);
+  saveFacilities(customerId, facilities);
 
   // §4.3 距離は保存時に算出する。失敗しても保存自体は成功させる
   let message = id ? "保存しました" : "登録しました";

@@ -24,64 +24,142 @@ export function findBaseCoefficient(
   return hit ? hit.coefficient : null;
 }
 
-export type SecurityPointsInput = {
-  /** 需要設備側のテーブル行（kVA）。使わない種別では空配列 */
-  primaryRows: CoefficientRowLike[];
-  primaryCapacity: number | null;
-  /** 太陽光・蓄電所側のテーブル行（kW）。「需要設備＋太陽光」で合算に使う */
-  secondaryRows?: CoefficientRowLike[];
-  secondaryCapacity?: number | null;
-  /** 点検周期の倍率 */
-  cycleMultiplier: number;
-  /** 手動上書き。設定されていればこれを採用する */
-  override?: number | null;
+/** 設備区分（換算値算出フロー図の分岐） */
+export type CategoryLike = {
+  calculationMethod: "table" | "fixed";
+  capacityUnit: "kVA" | "kW" | "none";
+  /** calculationMethod = "table" のときに引く係数表の行 */
+  rows?: CoefficientRowLike[];
+  minCapacity?: number | null;
+  maxCapacity?: number | null;
 };
 
-export type SecurityPointsResult = {
-  /** 周期倍率を掛ける前の基準換算係数（合算後） */
+/** 設備区分に紐づく点検周期と、その周期での補正 */
+export type CategoryCycleLike = {
+  intervalMonths: number;
+  /** table 方式：係数に掛ける倍率 */
+  multiplier?: number | null;
+  /** fixed 方式：容量によらず使う固定点数 */
+  fixedPoints?: number | null;
+};
+
+export type FacilityPointsInput = {
+  category: CategoryLike;
+  cycle: CategoryCycleLike;
+  capacity: number | null;
+  /** 換算係数（基準値）の手動指定。table 方式のとき容量判定より優先する */
+  coefficientOverride?: number | null;
+};
+
+export type FacilityPointsResult = {
+  /** 補正前の基準換算係数。fixed 方式では固定点数そのもの */
   base: number | null;
-  multiplier: number;
-  /** 保安管理点数（小数第2位） */
+  /** table 方式の倍率。fixed 方式では null */
+  multiplier: number | null;
+  /** この設備の保安管理点数 */
   points: number | null;
   isOverridden: boolean;
+  /** 容量が区分の適用範囲から外れている */
+  capacityOutOfRange: boolean;
 };
 
 /**
- * §4.1 換算係数の算出。
- * 1. override があればそれを採用して終了
- * 2-3. 容量からテーブル行の係数を引く（＋太陽光は合算）
- * 4. 点検周期の倍率を掛ける
- * 5. 小数第3位を四捨五入して小数第2位まで
+ * 設備1台の保安管理点数。
+ *
+ * - fixed 方式：周期ごとの固定点数をそのまま使う
+ *   （低圧、64kVA未満、64〜100kVA、EV充電設備、配電線路のみ）
+ * - table 方式：係数表から基準係数を引き、周期ごとの倍率を掛ける
+ *   （100kVA超過、火力、太陽光、蓄電所）
+ *
+ * 出典：換算値算出フロー図（2025-01-09）
  */
-export function calcSecurityPoints(
-  input: SecurityPointsInput,
-): SecurityPointsResult {
-  const multiplier = input.cycleMultiplier;
+export function calcFacilityPoints(
+  input: FacilityPointsInput,
+): FacilityPointsResult {
+  const { category, cycle } = input;
 
-  if (input.override != null && Number.isFinite(input.override)) {
+  const capacityOutOfRange =
+    category.capacityUnit !== "none" &&
+    input.capacity != null &&
+    ((category.minCapacity != null && input.capacity < category.minCapacity) ||
+      (category.maxCapacity != null && input.capacity > category.maxCapacity));
+
+  if (category.calculationMethod === "fixed") {
+    const fixed = cycle.fixedPoints;
+    if (fixed == null || !Number.isFinite(fixed)) {
+      return {
+        base: null,
+        multiplier: null,
+        points: null,
+        isOverridden: false,
+        capacityOutOfRange,
+      };
+    }
     return {
-      base: null,
-      multiplier,
-      points: roundPoints(input.override),
-      isOverridden: true,
+      base: fixed,
+      multiplier: null,
+      points: roundPoints(fixed),
+      isOverridden: false,
+      capacityOutOfRange,
     };
   }
 
-  const primary = findBaseCoefficient(input.primaryRows, input.primaryCapacity);
-  const secondary =
-    input.secondaryRows && input.secondaryRows.length > 0
-      ? findBaseCoefficient(input.secondaryRows, input.secondaryCapacity)
-      : null;
+  const multiplier = cycle.multiplier ?? 1;
+  const isOverridden =
+    input.coefficientOverride != null &&
+    Number.isFinite(input.coefficientOverride);
 
-  if (primary == null && secondary == null) {
-    return { base: null, multiplier, points: null, isOverridden: false };
+  const base = isOverridden
+    ? input.coefficientOverride!
+    : findBaseCoefficient(category.rows ?? [], input.capacity);
+
+  if (base == null) {
+    return {
+      base: null,
+      multiplier,
+      points: null,
+      isOverridden,
+      capacityOutOfRange,
+    };
   }
 
-  const base = roundPoints((primary ?? 0) + (secondary ?? 0));
   return {
     base,
     multiplier,
     points: roundPoints(base * multiplier),
-    isOverridden: false,
+    isOverridden,
+    capacityOutOfRange,
+  };
+}
+
+export type SitePointsResult = {
+  facilities: FacilityPointsResult[];
+  /** 事業場の合計点数。1つでも算出できない設備があれば null */
+  total: number | null;
+  /** 算出できなかった設備の位置 */
+  unresolvedIndexes: number[];
+};
+
+/**
+ * 事業場（1顧客）の保安管理点数。設備ごとに算出して合算する。
+ * 例）需要設備300kVA 2ヶ月 0.48 + 太陽光80kW自家消費 6ヶ月 0.075 = 0.555
+ */
+export function calcSitePoints(
+  facilities: FacilityPointsInput[],
+): SitePointsResult {
+  const results = facilities.map(calcFacilityPoints);
+  const unresolvedIndexes = results
+    .map((r, i) => (r.points == null ? i : -1))
+    .filter((i) => i >= 0);
+
+  if (results.length === 0) {
+    return { facilities: results, total: null, unresolvedIndexes };
+  }
+
+  const sum = results.reduce((acc, r) => acc + (r.points ?? 0), 0);
+  return {
+    facilities: results,
+    total: unresolvedIndexes.length > 0 ? null : roundPoints(sum),
+    unresolvedIndexes,
   };
 }

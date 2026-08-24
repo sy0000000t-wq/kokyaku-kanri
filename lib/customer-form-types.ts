@@ -2,35 +2,57 @@ import type { CoefficientRowLike } from "@/lib/calc/coefficient";
 import { generateCycleMonths } from "@/lib/calc/schedule";
 import { todayIso } from "@/lib/utils";
 
+export type FormCategoryCycle = {
+  id: number;
+  name: string;
+  intervalMonths: number;
+  multiplier: number | null;
+  fixedPoints: number | null;
+  requiresInsulationMonitor: boolean;
+  conditionNote: string;
+};
+
+export type FormCategory = {
+  id: number;
+  name: string;
+  categoryGroup: "demand" | "generation" | "other";
+  capacityUnit: "kVA" | "kW" | "none";
+  calculationMethod: "table" | "fixed";
+  coefficientTableId: number | null;
+  minCapacity: number | null;
+  maxCapacity: number | null;
+  note: string;
+  cycles: FormCategoryCycle[];
+};
+
 /** 顧客フォームがクライアント側で計算するのに必要なマスタ */
 export type FormMasters = {
-  facilityTypes: {
-    id: number;
-    name: string;
-    capacityUnit: "kVA" | "kW";
-    coefficientTableId: number | null;
-    secondaryCoefficientTableId: number | null;
-  }[];
-  inspectionCycles: {
-    id: number;
-    name: string;
-    intervalMonths: number;
-    coefficientMultiplier: number;
-  }[];
+  categories: FormCategory[];
+  inspectionCycles: { id: number; name: string; intervalMonths: number }[];
   billingCycles: { id: number; name: string; intervalMonths: number }[];
   coefficientRows: Record<number, CoefficientRowLike[]>;
   taxRate: number;
+};
+
+/** フォーム上の設備1行 */
+export type FacilityFormValue = {
+  /** 画面上の一意キー（新規行は負値ではなく uid 文字列で持つ） */
+  uid: string;
+  id: number | null;
+  categoryId: number;
+  categoryCycleId: number;
+  capacity: string;
+  /** 換算係数の指定方法 */
+  coefficientMode: "auto" | "select" | "manual";
+  coefficientOverride: string;
+  note: string;
 };
 
 export type CustomerFormValues = {
   id: number | null;
   code: string;
   name: string;
-  facilityTypeId: number;
-  capacityKva: number | null;
-  capacityKw: number | null;
   inspectionCycleId: number;
-  coefficientOverride: number | null;
   monthlyFee: number;
   annualFeeHandling: "included" | "separate";
   annualInspectionFee: number | null;
@@ -53,7 +75,29 @@ export type CustomerFormValues = {
   isActive: number;
   note: string;
   inspectionMonths: number[];
+  facilities: FacilityFormValue[];
 };
+
+let uidCounter = 0;
+export function nextUid(): string {
+  uidCounter += 1;
+  return `f${Date.now().toString(36)}-${uidCounter}`;
+}
+
+/** 設備行の初期値。既定は最初の設備区分とその最初の周期 */
+export function emptyFacility(masters: FormMasters): FacilityFormValue {
+  const category = masters.categories[0];
+  return {
+    uid: nextUid(),
+    id: null,
+    categoryId: category?.id ?? 0,
+    categoryCycleId: category?.cycles[0]?.id ?? 0,
+    capacity: "",
+    coefficientMode: "auto",
+    coefficientOverride: "",
+    note: "",
+  };
+}
 
 /** 新規登録時の初期値。サーバーコンポーネントから呼ぶのでクライアント境界には置かない */
 export function emptyCustomer(
@@ -67,11 +111,7 @@ export function emptyCustomer(
     id: null,
     code,
     name: "",
-    facilityTypeId: masters.facilityTypes[0]?.id ?? 0,
-    capacityKva: null,
-    capacityKw: null,
     inspectionCycleId: cycle?.id ?? 0,
-    coefficientOverride: null,
     monthlyFee: 0,
     annualFeeHandling: "included",
     annualInspectionFee: null,
@@ -97,5 +137,6 @@ export function emptyCustomer(
       now.getMonth() + 1,
       cycle?.intervalMonths ?? 1,
     ),
+    facilities: [emptyFacility(masters)],
   };
 }

@@ -1,7 +1,7 @@
 import { csvResponse, toCsv } from "@/lib/csv";
 import { applyCustomerFilters, parseCustomerFilters } from "@/lib/customer-filter";
 import { getCustomerViews } from "@/lib/queries";
-import { todayIso } from "@/lib/utils";
+import { summarizeFacility, todayIso } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -14,10 +14,7 @@ export async function GET(request: Request) {
     [
       "顧客ID",
       "物件名称",
-      "施設種別",
-      "需要設備容量(kVA)",
-      "太陽光出力(kW)",
-      "点検周期",
+      "設備",
       "保安管理点数",
       "月額(税抜)",
       "月額(税込)",
@@ -34,6 +31,7 @@ export async function GET(request: Request) {
       "メール",
       "契約開始日",
       "解除日",
+      "訪問周期",
       "通常点検月",
       "年次点検月",
       "請求サイクル",
@@ -44,10 +42,16 @@ export async function GET(request: Request) {
     rows.map((c) => [
       c.code,
       c.name,
-      c.facilityType?.name ?? "",
-      c.capacityKva ?? "",
-      c.capacityKw ?? "",
-      c.inspectionCycle?.name ?? "",
+      // 設備は「区分 容量 / 周期 / 点数」を改行区切りで1セルにまとめる
+      c.facilities
+        .map((f) =>
+          [
+            summarizeFacility(f.category?.name, f.capacity, f.category?.capacityUnit),
+            f.cycle?.name ?? "",
+            f.result.points ?? "",
+          ].join(" / "),
+        )
+        .join("\n"),
       c.points ?? "",
       c.pricing.monthlyExcl,
       c.pricing.monthlyIncl,
@@ -64,6 +68,7 @@ export async function GET(request: Request) {
       c.email,
       c.contractStartDate,
       c.contractEndDate ?? "",
+      c.inspectionCycle?.name ?? "",
       c.inspectionMonths.join(" "),
       c.annualInspectionMonth ?? "",
       c.billingCycle?.name ?? "",

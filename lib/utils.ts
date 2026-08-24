@@ -19,10 +19,14 @@ export function formatYen(value: number | null | undefined): string {
   return `¥${yen.format(value)}`;
 }
 
-/** 保安管理点数（小数第2位固定） */
+/**
+ * 保安管理点数。小数第2位までを基本とし、第3位に値があるときだけ3桁表示する。
+ * 換算値算出フロー図の参考例が 0.075 点・計 0.555 点と第3位まで扱うため。
+ */
 export function formatPoints(value: number | null | undefined): string {
   if (value == null || !Number.isFinite(value)) return "—";
-  return value.toFixed(2);
+  const three = value.toFixed(3);
+  return three.endsWith("0") ? value.toFixed(2) : three;
 }
 
 /** 距離（小数第1位） */
@@ -67,3 +71,14 @@ export function telHref(phone: string): string {
 }
 
 export const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+
+/** 設備の一覧を「区分（容量）」形式の短い文字列にする */
+export function summarizeFacility(
+  categoryName: string | null | undefined,
+  capacity: number | null | undefined,
+  unit: string | null | undefined,
+): string {
+  const name = categoryName ?? "—";
+  if (capacity == null || unit == null || unit === "none") return name;
+  return `${name} ${formatNumber(capacity)}${unit}`;
+}

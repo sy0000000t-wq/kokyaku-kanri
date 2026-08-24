@@ -10,11 +10,16 @@ import {
   type ActionState,
 } from "@/app/actions/customer";
 import { Badge, Button, buttonClass, Card, CardHeader, Field, Input, Select, Textarea } from "@/components/ui";
-import { calcSecurityPoints } from "@/lib/calc/coefficient";
+import { roundPoints } from "@/lib/calc/round";
+import {
+  FacilityRows,
+  facilityResult,
+} from "@/components/customers/facility-rows";
 import { calcPricing } from "@/lib/calc/pricing";
 import { generateCycleMonths, parseYearMonth } from "@/lib/calc/schedule";
 import type {
   CustomerFormValues,
+  FacilityFormValue,
   FormMasters,
 } from "@/lib/customer-form-types";
 import { cn, formatKm, formatPoints, formatYen, MONTHS } from "@/lib/utils";
@@ -34,20 +39,14 @@ export function CustomerForm({
   const [state, formAction, isSaving] = useActionState(saveCustomer, initialState);
   const errors = state.status === "error" ? state.errors : {};
 
-  const [facilityTypeId, setFacilityTypeId] = useState(initial.facilityTypeId);
+  const [facilities, setFacilities] = useState<FacilityFormValue[]>(
+    initial.facilities,
+  );
   const [inspectionCycleId, setInspectionCycleId] = useState(initial.inspectionCycleId);
-  const [capacityKva, setCapacityKva] = useState(initial.capacityKva?.toString() ?? "");
-  const [capacityKw, setCapacityKw] = useState(initial.capacityKw?.toString() ?? "");
   const [monthlyFee, setMonthlyFee] = useState(initial.monthlyFee.toString());
   const [annualFeeHandling, setAnnualFeeHandling] = useState(initial.annualFeeHandling);
   const [annualInspectionFee, setAnnualInspectionFee] = useState(
     initial.annualInspectionFee?.toString() ?? "",
-  );
-  const [useCoefficientOverride, setUseCoefficientOverride] = useState(
-    initial.coefficientOverride != null,
-  );
-  const [coefficientOverride, setCoefficientOverride] = useState(
-    initial.coefficientOverride?.toString() ?? "",
   );
   const [useUnitPriceOverride, setUseUnitPriceOverride] = useState(
     initial.unitPriceOverride != null,
@@ -91,57 +90,34 @@ export function CustomerForm({
   const [distanceMessage, setDistanceMessage] = useState<string | null>(null);
   const [recalcPending, startRecalc] = useTransition();
 
-  const facilityType = masters.facilityTypes.find((f) => f.id === facilityTypeId);
   const cycle = masters.inspectionCycles.find((c) => c.id === inspectionCycleId);
 
-  const showKva = facilityType?.capacityUnit === "kVA";
-  const showKw =
-    facilityType?.capacityUnit === "kW" || facilityType?.secondaryCoefficientTableId != null;
-
-  // §5.4 リアルタイム計算プレビュー
+  // 設備ごとに点数を出して合算する（換算値算出フロー図 参考例1・2）
   const preview = useMemo(() => {
-    const primaryRows = facilityType?.coefficientTableId
-      ? (masters.coefficientRows[facilityType.coefficientTableId] ?? [])
-      : [];
-    const secondaryRows = facilityType?.secondaryCoefficientTableId
-      ? (masters.coefficientRows[facilityType.secondaryCoefficientTableId] ?? [])
-      : [];
-    const kva = capacityKva === "" ? null : Number(capacityKva);
-    const kw = capacityKw === "" ? null : Number(capacityKw);
-
-    const points = calcSecurityPoints({
-      primaryRows,
-      primaryCapacity: facilityType?.capacityUnit === "kW" ? kw : kva,
-      secondaryRows,
-      secondaryCapacity: kw,
-      cycleMultiplier: cycle?.coefficientMultiplier ?? 1,
-      override:
-        useCoefficientOverride && coefficientOverride !== ""
-          ? Number(coefficientOverride)
-          : null,
-    });
+    // facilityResult が容量と手動指定を反映済みなので、行の結果をそのまま足す
+    const perFacility = facilities.map((f) => facilityResult(f, masters));
+    const values = perFacility.map((p) => p.result.points);
+    const total =
+      values.length === 0 || values.some((v) => v == null)
+        ? null
+        : roundPoints(values.reduce<number>((a, b) => a + (b ?? 0), 0));
 
     const pricing = calcPricing({
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
       annualFeeHandling,
       annualInspectionFee: annualInspectionFee === "" ? null : Number(annualInspectionFee),
       taxRate: masters.taxRate,
-      points: points.points,
+      points: total,
       unitPriceOverride:
         useUnitPriceOverride && unitPriceOverride !== "" ? Number(unitPriceOverride) : null,
     });
 
-    return { points, pricing };
+    return { perFacility, total, pricing };
   }, [
-    facilityType,
-    cycle,
-    capacityKva,
-    capacityKw,
+    facilities,
     monthlyFee,
     annualFeeHandling,
     annualInspectionFee,
-    useCoefficientOverride,
-    coefficientOverride,
     useUnitPriceOverride,
     unitPriceOverride,
     masters,
@@ -195,6 +171,22 @@ export function CustomerForm({
     <form action={formAction} onChange={() => setDirty(true)} className="space-y-4">
       <input type="hidden" name="id" value={initial.id ?? ""} />
       <input type="hidden" name="isActive" value={isActive ? "1" : "0"} />
+      {/* 設備は行数が可変なので JSON でまとめて送る */}
+      <input
+        type="hidden"
+        name="facilities"
+        value={JSON.stringify(
+          facilities.map((f) => ({
+            id: f.id,
+            categoryId: f.categoryId,
+            categoryCycleId: f.categoryCycleId,
+            capacity: f.capacity,
+            coefficientOverride:
+              f.coefficientMode === "auto" ? "" : f.coefficientOverride,
+            note: f.note,
+          })),
+        )}
+      />
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-4">
@@ -210,20 +202,6 @@ export function CustomerForm({
                 <Input name="name" {...bind("name")} />
                 {err("name")}
               </Field>
-              <Field label="施設種別" required>
-                <Select
-                  name="facilityTypeId"
-                  value={facilityTypeId}
-                  onChange={(e) => setFacilityTypeId(Number(e.target.value))}
-                >
-                  {masters.facilityTypes.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-                </Select>
-                {err("facilityTypeId")}
-              </Field>
               <Field label="備考" className="sm:col-span-2">
                 <Textarea name="note" {...bind("note")} rows={2} />
               </Field>
@@ -232,37 +210,30 @@ export function CustomerForm({
 
           {/* 2. 設備情報 */}
           <Card>
-            <CardHeader title="設備情報" />
-            <div className="grid gap-3 p-4 sm:grid-cols-2">
-              {showKva && (
-                <Field label="需要設備容量（kVA）" required>
-                  <Input
-                    name="capacityKva"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    inputMode="decimal"
-                    value={capacityKva}
-                    onChange={(e) => setCapacityKva(e.target.value)}
-                  />
-                  {err("capacityKva")}
-                </Field>
+            <CardHeader
+              title="設備情報"
+              description="事業場にある設備ごとに区分と周期を選びます。点数は設備ごとに出して合算します"
+            />
+            <div className="space-y-4 p-4">
+              <FacilityRows
+                masters={masters}
+                facilities={facilities}
+                onChange={(next) => {
+                  setFacilities(next);
+                  setDirty(true);
+                }}
+              />
+              {err("facilities") && (
+                <p className="text-xs text-danger" role="alert">
+                  {errors.facilities}
+                </p>
               )}
-              {showKw && (
-                <Field label="太陽光・蓄電所出力（kW）" required>
-                  <Input
-                    name="capacityKw"
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    inputMode="decimal"
-                    value={capacityKw}
-                    onChange={(e) => setCapacityKw(e.target.value)}
-                  />
-                  {err("capacityKw")}
-                </Field>
-              )}
-              <Field label="点検周期" required>
+
+              <Field
+                label="訪問周期"
+                required
+                hint="現場に行く周期です。点検月のプリセットに使います（点数計算には影響しません）"
+              >
                 <Select
                   name="inspectionCycleId"
                   value={inspectionCycleId}
@@ -279,32 +250,6 @@ export function CustomerForm({
                   ))}
                 </Select>
                 {err("inspectionCycleId")}
-              </Field>
-              <Field
-                label="換算係数"
-                hint="未チェックのときは容量と周期から自動計算します"
-              >
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-xs whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      name="useCoefficientOverride"
-                      checked={useCoefficientOverride}
-                      onChange={(e) => setUseCoefficientOverride(e.target.checked)}
-                    />
-                    手動で上書き
-                  </label>
-                  <Input
-                    name="coefficientOverride"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={coefficientOverride}
-                    onChange={(e) => setCoefficientOverride(e.target.value)}
-                    disabled={!useCoefficientOverride}
-                    placeholder={formatPoints(preview.points.points)}
-                  />
-                </div>
               </Field>
             </div>
           </Card>
@@ -574,17 +519,26 @@ export function CustomerForm({
           <Card>
             <CardHeader title="計算プレビュー" />
             <dl className="divide-y divide-line text-sm">
-              <Row label="換算係数（基準）">
-                {preview.points.isOverridden ? "—" : formatPoints(preview.points.base)}
-              </Row>
-              <Row label="点検周期倍率">×{preview.points.multiplier.toFixed(2)}</Row>
-              <Row label="保安管理点数" strong>
-                {formatPoints(preview.points.points)}
-                {preview.points.isOverridden && (
-                  <Badge tone="warn" className="ml-1.5">
-                    上書
-                  </Badge>
-                )}
+              {preview.perFacility.map((f, i) => (
+                <Row
+                  key={facilities[i].uid}
+                  label={f.category?.name ?? `設備 ${i + 1}`}
+                >
+                  <span className="text-xs text-muted">
+                    {f.result.multiplier != null && f.result.base != null
+                      ? `${f.result.base} × ${f.result.multiplier} =`
+                      : `${f.cycle?.name ?? ""} =`}
+                  </span>
+                  <span className="ml-1.5">{formatPoints(f.result.points)}</span>
+                  {f.result.isOverridden && (
+                    <Badge tone="warn" className="ml-1.5">
+                      手動
+                    </Badge>
+                  )}
+                </Row>
+              ))}
+              <Row label="保安管理点数 合計" strong>
+                {formatPoints(preview.total)}
               </Row>
               <Row label="月額税抜">{formatYen(preview.pricing.monthlyExcl)}</Row>
               <Row label="月額税込">{formatYen(preview.pricing.monthlyIncl)}</Row>
@@ -604,10 +558,9 @@ export function CustomerForm({
                 )}
               </Row>
             </dl>
-            {preview.points.points == null && !preview.points.isOverridden && (
+            {preview.total == null && (
               <p className="border-t border-line px-4 py-2.5 text-xs text-warn">
-                設備容量が換算係数テーブルのレンジ外です。設定画面で行を追加するか、
-                換算係数を手動で上書きしてください。
+                点数を算出できない設備があります。設備情報の警告を確認してください。
               </p>
             )}
           </Card>

@@ -10,12 +10,17 @@ import { openDb } from "./db-connect";
  * 実データは data/sample-customers.json（.gitignore 済み）に置く。
  * 無い場合は data/sample-customers.example.json（ダミー）を使う。
  */
+type SampleFacility = {
+  category: string;
+  cycle: string;
+  capacity?: number | null;
+  note?: string;
+};
+
 type SampleCustomer = {
   code: string;
   name: string;
-  facilityType: string;
-  capacityKva?: number | null;
-  capacityKw?: number | null;
+  facilities: SampleFacility[];
   inspectionCycle: string;
   monthlyFee: number;
   annualFeeHandling: "included" | "separate";
@@ -52,11 +57,12 @@ const samples: SampleCustomer[] = JSON.parse(
 
 const { sqlite, db } = openDb();
 
-const facilityTypes = db.select().from(schema.facilityTypes).all();
+const categories = db.select().from(schema.equipmentCategories).all();
+const categoryCycles = db.select().from(schema.categoryCycles).all();
 const cycles = db.select().from(schema.inspectionCycles).all();
 const billingCycles = db.select().from(schema.billingCycles).all();
 
-if (facilityTypes.length === 0 || cycles.length === 0) {
+if (categories.length === 0 || cycles.length === 0) {
   console.error("マスタが未投入です。先に `npm run db:migrate` を実行してください。");
   process.exit(1);
 }
@@ -73,10 +79,27 @@ for (const s of samples) {
     continue;
   }
 
-  const facilityType = facilityTypes.find((f) => f.name === s.facilityType);
   const cycle = cycles.find((c) => c.name === s.inspectionCycle);
-  if (!facilityType || !cycle) {
-    console.error(`  ! ${s.code}: 施設種別または点検周期が見つかりません`);
+  if (!cycle) {
+    console.error(`  ! ${s.code}: 訪問周期が見つかりません`);
+    continue;
+  }
+
+  const facilities = s.facilities.map((f) => {
+    const category = categories.find((c) => c.name === f.category);
+    const categoryCycle = category
+      ? categoryCycles.find(
+          (c) => c.categoryId === category.id && c.name === f.cycle,
+        )
+      : undefined;
+    return { spec: f, category, categoryCycle };
+  });
+
+  const missing = facilities.find((f) => !f.category || !f.categoryCycle);
+  if (missing) {
+    console.error(
+      `  ! ${s.code}: 設備区分「${missing.spec.category}」または周期「${missing.spec.cycle}」が見つかりません`,
+    );
     continue;
   }
   const billingCycle =
@@ -88,9 +111,6 @@ for (const s of samples) {
     .values({
       code: s.code,
       name: s.name,
-      facilityTypeId: facilityType.id,
-      capacityKva: s.capacityKva ?? null,
-      capacityKw: s.capacityKw ?? null,
       inspectionCycleId: cycle.id,
       monthlyFee: s.monthlyFee,
       annualFeeHandling: s.annualFeeHandling,
@@ -109,6 +129,19 @@ for (const s of samples) {
     .returning()
     .get();
 
+  db.insert(schema.customerFacilities)
+    .values(
+      facilities.map((f, i) => ({
+        customerId: customer.id,
+        categoryId: f.category!.id,
+        categoryCycleId: f.categoryCycle!.id,
+        capacity: f.spec.capacity ?? null,
+        note: f.spec.note ?? "",
+        sortOrder: i,
+      })),
+    )
+    .run();
+
   const startMonth = parseYearMonth(s.contractStartDate)?.month ?? 1;
   const months = generateCycleMonths(startMonth, cycle.intervalMonths);
   if (months.length > 0) {
@@ -117,7 +150,9 @@ for (const s of samples) {
       .run();
   }
 
-  console.log(`  - ${s.code} ${s.name} を追加（点検月: ${months.join("・")}月）`);
+  console.log(
+    `  - ${s.code} ${s.name} を追加（設備 ${facilities.length} 件 / 点検月: ${months.join("・")}月）`,
+  );
   inserted++;
 }
 

@@ -4,20 +4,28 @@ import { db } from "@/db";
 import * as schema from "@/db/schema";
 import type {
   BillingCycle,
+  CategoryCycle,
   CoefficientRow,
   CoefficientTable,
   Customer,
-  FacilityType,
+  CustomerFacility,
+  EquipmentCategory,
   InspectionCycle,
   Settings,
 } from "@/db/schema";
-import { calcSecurityPoints } from "@/lib/calc/coefficient";
+import {
+  calcSitePoints,
+  type CategoryLike,
+  type FacilityPointsInput,
+  type FacilityPointsResult,
+} from "@/lib/calc/coefficient";
 import { calcPricing, type PricingResult } from "@/lib/calc/pricing";
 import { generateCycleMonths, parseYearMonth } from "@/lib/calc/schedule";
 
 export type Masters = {
   settings: Settings;
-  facilityTypes: FacilityType[];
+  equipmentCategories: EquipmentCategory[];
+  categoryCyclesByCategory: Map<number, CategoryCycle[]>;
   inspectionCycles: InspectionCycle[];
   billingCycles: BillingCycle[];
   coefficientTables: CoefficientTable[];
@@ -54,13 +62,27 @@ export function getMasters(): Masters {
     coefficientRowsByTable.set(row.tableId, list);
   }
 
+  const categoryCycles = db
+    .select()
+    .from(schema.categoryCycles)
+    .orderBy(asc(schema.categoryCycles.sortOrder))
+    .all();
+
+  const categoryCyclesByCategory = new Map<number, CategoryCycle[]>();
+  for (const cycle of categoryCycles) {
+    const list = categoryCyclesByCategory.get(cycle.categoryId) ?? [];
+    list.push(cycle);
+    categoryCyclesByCategory.set(cycle.categoryId, list);
+  }
+
   return {
     settings: getSettings(),
-    facilityTypes: db
+    equipmentCategories: db
       .select()
-      .from(schema.facilityTypes)
-      .orderBy(asc(schema.facilityTypes.sortOrder))
+      .from(schema.equipmentCategories)
+      .orderBy(asc(schema.equipmentCategories.sortOrder))
       .all(),
+    categoryCyclesByCategory,
     inspectionCycles: db
       .select()
       .from(schema.inspectionCycles)
@@ -76,64 +98,97 @@ export function getMasters(): Masters {
   };
 }
 
+/** 設備区分を計算関数が受け取る形にする */
+export function toCategoryLike(
+  category: EquipmentCategory,
+  masters: Masters,
+): CategoryLike {
+  return {
+    calculationMethod: category.calculationMethod,
+    capacityUnit: category.capacityUnit,
+    rows: category.coefficientTableId
+      ? (masters.coefficientRowsByTable.get(category.coefficientTableId) ?? [])
+      : [],
+    minCapacity: category.minCapacity,
+    maxCapacity: category.maxCapacity,
+  };
+}
+
+/** 顧客の設備1行に、区分・周期・計算結果を載せたもの */
+export type FacilityView = CustomerFacility & {
+  category: EquipmentCategory | null;
+  cycle: CategoryCycle | null;
+  result: FacilityPointsResult;
+};
+
 export type CustomerView = Customer & {
-  facilityType: FacilityType | null;
   inspectionCycle: InspectionCycle | null;
   billingCycle: BillingCycle | null;
   /** customer_inspection_months の内容（最終的な正） */
   inspectionMonths: number[];
   /** 請求サイクルから導出した請求月 */
   billingMonths: number[];
-  /** 周期倍率を掛ける前の基準換算係数 */
-  baseCoefficient: number | null;
-  cycleMultiplier: number;
+  facilities: FacilityView[];
+  /** 事業場の合計保安管理点数。算出できない設備があれば null */
   points: number | null;
-  isPointsOverridden: boolean;
   pricing: PricingResult;
 };
 
-/** 顧客1件にマスタと計算結果を載せる（§4.1 / §4.2） */
+/** 顧客1件にマスタと計算結果を載せる */
 export function buildCustomerView(
   customer: Customer,
   masters: Masters,
   inspectionMonths: number[],
+  facilities: CustomerFacility[],
 ): CustomerView {
-  const facilityType =
-    masters.facilityTypes.find((f) => f.id === customer.facilityTypeId) ?? null;
   const inspectionCycle =
     masters.inspectionCycles.find((c) => c.id === customer.inspectionCycleId) ??
     null;
   const billingCycle =
     masters.billingCycles.find((b) => b.id === customer.billingCycleId) ?? null;
 
-  const primaryRows = facilityType?.coefficientTableId
-    ? (masters.coefficientRowsByTable.get(facilityType.coefficientTableId) ?? [])
-    : [];
-  const secondaryRows = facilityType?.secondaryCoefficientTableId
-    ? (masters.coefficientRowsByTable.get(
-        facilityType.secondaryCoefficientTableId,
-      ) ?? [])
-    : [];
+  const sorted = [...facilities].sort((a, b) => a.sortOrder - b.sortOrder);
 
-  // 単位が kW の種別は kW 側の容量を主容量として使う
-  const primaryCapacity =
-    facilityType?.capacityUnit === "kW" ? customer.capacityKw : customer.capacityKva;
+  const inputs: FacilityPointsInput[] = sorted.map((f) => {
+    const category =
+      masters.equipmentCategories.find((c) => c.id === f.categoryId) ?? null;
+    const cycle =
+      masters.categoryCyclesByCategory
+        .get(f.categoryId)
+        ?.find((c) => c.id === f.categoryCycleId) ?? null;
 
-  const points = calcSecurityPoints({
-    primaryRows,
-    primaryCapacity: primaryCapacity ?? null,
-    secondaryRows,
-    secondaryCapacity: customer.capacityKw ?? null,
-    cycleMultiplier: inspectionCycle?.coefficientMultiplier ?? 1,
-    override: customer.coefficientOverride,
+    return {
+      category: category
+        ? toCategoryLike(category, masters)
+        : { calculationMethod: "table", capacityUnit: "kVA", rows: [] },
+      cycle: {
+        intervalMonths: cycle?.intervalMonths ?? 1,
+        multiplier: cycle?.multiplier ?? null,
+        fixedPoints: cycle?.fixedPoints ?? null,
+      },
+      capacity: f.capacity,
+      coefficientOverride: f.coefficientOverride,
+    };
   });
+
+  const site = calcSitePoints(inputs);
+
+  const facilityViews: FacilityView[] = sorted.map((f, i) => ({
+    ...f,
+    category: masters.equipmentCategories.find((c) => c.id === f.categoryId) ?? null,
+    cycle:
+      masters.categoryCyclesByCategory
+        .get(f.categoryId)
+        ?.find((c) => c.id === f.categoryCycleId) ?? null,
+    result: site.facilities[i],
+  }));
 
   const pricing = calcPricing({
     monthlyFee: customer.monthlyFee,
     annualFeeHandling: customer.annualFeeHandling,
     annualInspectionFee: customer.annualInspectionFee,
     taxRate: masters.settings.taxRate,
-    points: points.points,
+    points: site.total,
     unitPriceOverride: customer.unitPriceOverride,
   });
 
@@ -144,15 +199,12 @@ export function buildCustomerView(
 
   return {
     ...customer,
-    facilityType,
     inspectionCycle,
     billingCycle,
     inspectionMonths,
     billingMonths,
-    baseCoefficient: points.base,
-    cycleMultiplier: points.multiplier,
-    points: points.points,
-    isPointsOverridden: points.isOverridden,
+    facilities: facilityViews,
+    points: site.total,
     pricing,
   };
 }
@@ -169,24 +221,51 @@ export function getInspectionMonthsByCustomer(): Map<number, number[]> {
   return map;
 }
 
+export function getFacilitiesByCustomer(): Map<number, CustomerFacility[]> {
+  const rows = db
+    .select()
+    .from(schema.customerFacilities)
+    .orderBy(asc(schema.customerFacilities.sortOrder))
+    .all();
+  const map = new Map<number, CustomerFacility[]>();
+  for (const r of rows) {
+    const list = map.get(r.customerId) ?? [];
+    list.push(r);
+    map.set(r.customerId, list);
+  }
+  return map;
+}
+
 /** 全顧客のビュー。並びは顧客ID順 */
 export function getCustomerViews(): CustomerView[] {
   const masters = getMasters();
   const monthsMap = getInspectionMonthsByCustomer();
+  const facilitiesMap = getFacilitiesByCustomer();
   return db
     .select()
     .from(schema.customers)
     .orderBy(asc(schema.customers.code))
     .all()
-    .map((c) => buildCustomerView(c, masters, monthsMap.get(c.id) ?? []));
+    .map((c) =>
+      buildCustomerView(
+        c,
+        masters,
+        monthsMap.get(c.id) ?? [],
+        facilitiesMap.get(c.id) ?? [],
+      ),
+    );
 }
 
 export function getCustomerView(id: number): CustomerView | null {
   const customer = db.select().from(schema.customers).all().find((c) => c.id === id);
   if (!customer) return null;
   const masters = getMasters();
-  const months = getInspectionMonthsByCustomer().get(id) ?? [];
-  return buildCustomerView(customer, masters, months);
+  return buildCustomerView(
+    customer,
+    masters,
+    getInspectionMonthsByCustomer().get(id) ?? [],
+    getFacilitiesByCustomer().get(id) ?? [],
+  );
 }
 
 /** §5.3 集計フッター。対象は常に稼働中の行 */
@@ -207,7 +286,7 @@ export function summarizeCustomers(views: CustomerView[]) {
 
   return {
     count: active.length,
-    points: Math.round(points * 100) / 100,
+    points: Math.round(points * 1000) / 1000,
     monthlyExcl,
     annualExcl,
     annualIncl,

@@ -43,29 +43,70 @@ export const coefficientRows = sqliteTable("coefficient_rows", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 
-/** §3.3 施設種別マスタ */
-export const facilityTypes = sqliteTable("facility_types", {
+/**
+ * 設備区分マスタ。換算値算出フロー図の分岐そのものを表す。
+ * `table` は容量から係数表を引き、`fixed` は容量によらず固定点数を使う。
+ */
+export const equipmentCategories = sqliteTable("equipment_categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
-  capacityUnit: text("capacity_unit", { enum: ["kVA", "kW"] }).notNull(),
+  /** 需要設備 / 発電所等 / その他。画面のグループ見出しに使う */
+  categoryGroup: text("category_group", {
+    enum: ["demand", "generation", "other"],
+  })
+    .notNull()
+    .default("demand"),
+  /** none は容量入力が不要な区分（配電線路のみ など） */
+  capacityUnit: text("capacity_unit", { enum: ["kVA", "kW", "none"] })
+    .notNull()
+    .default("kVA"),
+  calculationMethod: text("calculation_method", { enum: ["table", "fixed"] })
+    .notNull()
+    .default("table"),
+  /** calculation_method = table のときに引く係数表 */
   coefficientTableId: integer("coefficient_table_id").references(
     () => coefficientTables.id,
   ),
-  /** 「需要設備＋太陽光」のように kW 側の係数も合算する種別で使う */
-  secondaryCoefficientTableId: integer("secondary_coefficient_table_id").references(
-    () => coefficientTables.id,
-  ),
+  /** 適用できる容量の目安。入力時の警告にのみ使う */
+  minCapacity: real("min_capacity"),
+  maxCapacity: real("max_capacity"),
+  note: text("note").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: integer("is_active").notNull().default(1),
 });
 
-/** §3.4 点検周期マスタ */
+/**
+ * 設備区分ごとに選べる点検周期と、その周期での補正。
+ * table 方式は multiplier（係数に掛ける）、fixed 方式は fixedPoints（そのまま点数）。
+ */
+export const categoryCycles = sqliteTable("category_cycles", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  categoryId: integer("category_id")
+    .notNull()
+    .references(() => equipmentCategories.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  intervalMonths: integer("interval_months").notNull(),
+  multiplier: real("multiplier"),
+  fixedPoints: real("fixed_points"),
+  /** フロー図の「絶縁監視装置 必須」 */
+  requiresInsulationMonitor: integer("requires_insulation_monitor")
+    .notNull()
+    .default(0),
+  /** フロー図の「条件適用」「※固定」などの注記 */
+  conditionNote: text("condition_note").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/**
+ * 点検周期マスタ＝現場を訪問する周期。点検月の生成にだけ使う。
+ * 換算係数の補正倍率はここではなく category_cycles が持つ
+ * （倍率は「設備区分 × 周期」で決まるため。換算値算出フロー図による）。
+ */
 export const inspectionCycles = sqliteTable("inspection_cycles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   /** 0 は「実施なし」 */
   intervalMonths: integer("interval_months").notNull(),
-  coefficientMultiplier: real("coefficient_multiplier").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
   isActive: integer("is_active").notNull().default(1),
 });
@@ -84,15 +125,10 @@ export const customers = sqliteTable("customers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   code: text("code").notNull().unique(),
   name: text("name").notNull(),
-  facilityTypeId: integer("facility_type_id")
-    .notNull()
-    .references(() => facilityTypes.id),
-  capacityKva: real("capacity_kva"),
-  capacityKw: real("capacity_kw"),
+  /** 現場を訪問する周期（点検月の生成に使う）。点数計算には使わない */
   inspectionCycleId: integer("inspection_cycle_id")
     .notNull()
     .references(() => inspectionCycles.id),
-  coefficientOverride: real("coefficient_override"),
   monthlyFee: integer("monthly_fee").notNull().default(0),
   annualFeeHandling: text("annual_fee_handling", {
     enum: ["included", "separate"],
@@ -122,6 +158,30 @@ export const customers = sqliteTable("customers", {
   note: text("note").notNull().default(""),
   createdAt: text("created_at").notNull().default(sql`(datetime('now'))`),
   updatedAt: text("updated_at").notNull().default(sql`(datetime('now'))`),
+});
+
+/**
+ * 事業場に設置されている設備。1事業場に複数あり、それぞれ別の点検周期を持つ。
+ * 保安管理点数はこの行ごとに算出して合算する（換算値算出フロー図 参考例1・2）。
+ */
+export const customerFacilities = sqliteTable("customer_facilities", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  customerId: integer("customer_id")
+    .notNull()
+    .references(() => customers.id, { onDelete: "cascade" }),
+  categoryId: integer("category_id")
+    .notNull()
+    .references(() => equipmentCategories.id),
+  /** 区分に紐づく周期のどれを適用するか */
+  categoryCycleId: integer("category_cycle_id")
+    .notNull()
+    .references(() => categoryCycles.id),
+  /** 設備容量。capacity_unit = none の区分では NULL */
+  capacity: real("capacity"),
+  /** 換算係数（基準値）の手動指定。設定すると容量からの自動判定より優先する */
+  coefficientOverride: real("coefficient_override"),
+  note: text("note").notNull().default(""),
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 /** §3.7 通常点検の実施月（最終的な正はこのテーブル） */
@@ -178,7 +238,9 @@ export const billingRecords = sqliteTable(
 );
 
 export type Settings = typeof settings.$inferSelect;
-export type FacilityType = typeof facilityTypes.$inferSelect;
+export type EquipmentCategory = typeof equipmentCategories.$inferSelect;
+export type CategoryCycle = typeof categoryCycles.$inferSelect;
+export type CustomerFacility = typeof customerFacilities.$inferSelect;
 export type InspectionCycle = typeof inspectionCycles.$inferSelect;
 export type BillingCycle = typeof billingCycles.$inferSelect;
 export type CoefficientTable = typeof coefficientTables.$inferSelect;

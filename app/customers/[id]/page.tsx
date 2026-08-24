@@ -42,11 +42,7 @@ export default async function EditCustomerPage({
           id: customer.id,
           code: customer.code,
           name: customer.name,
-          facilityTypeId: customer.facilityTypeId,
-          capacityKva: customer.capacityKva,
-          capacityKw: customer.capacityKw,
           inspectionCycleId: customer.inspectionCycleId,
-          coefficientOverride: customer.coefficientOverride,
           monthlyFee: customer.monthlyFee,
           annualFeeHandling: customer.annualFeeHandling,
           annualInspectionFee: customer.annualInspectionFee,
@@ -69,6 +65,16 @@ export default async function EditCustomerPage({
           isActive: customer.isActive,
           note: customer.note,
           inspectionMonths: customer.inspectionMonths,
+          facilities: customer.facilities.map((f) => ({
+            uid: `db-${f.id}`,
+            id: f.id,
+            categoryId: f.categoryId,
+            categoryCycleId: f.categoryCycleId,
+            capacity: f.capacity?.toString() ?? "",
+            coefficientMode: f.coefficientOverride != null ? "manual" : "auto",
+            coefficientOverride: f.coefficientOverride?.toString() ?? "",
+            note: f.note,
+          })),
         }}
       />
     </div>

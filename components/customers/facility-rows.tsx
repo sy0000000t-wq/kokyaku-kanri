@@ -1,0 +1,297 @@
+"use client";
+
+import { Badge, Button, Input, Select } from "@/components/ui";
+import { calcFacilityPoints } from "@/lib/calc/coefficient";
+import type {
+  FacilityFormValue,
+  FormCategory,
+  FormMasters,
+} from "@/lib/customer-form-types";
+import { emptyFacility } from "@/lib/customer-form-types";
+import { cn, formatPoints } from "@/lib/utils";
+
+const GROUP_LABEL: Record<FormCategory["categoryGroup"], string> = {
+  demand: "需要設備",
+  generation: "発電所等",
+  other: "その他",
+};
+
+/** 設備区分と周期から、その行の点数を計算する */
+export function facilityResult(row: FacilityFormValue, masters: FormMasters) {
+  const category = masters.categories.find((c) => c.id === row.categoryId);
+  const cycle = category?.cycles.find((c) => c.id === row.categoryCycleId);
+
+  const rows = category?.coefficientTableId
+    ? (masters.coefficientRows[category.coefficientTableId] ?? [])
+    : [];
+
+  const override =
+    row.coefficientMode !== "auto" && row.coefficientOverride !== ""
+      ? Number(row.coefficientOverride)
+      : null;
+
+  return {
+    category,
+    cycle,
+    coefficientRows: rows,
+    result: calcFacilityPoints({
+      category: {
+        calculationMethod: category?.calculationMethod ?? "table",
+        capacityUnit: category?.capacityUnit ?? "kVA",
+        rows,
+        minCapacity: category?.minCapacity ?? null,
+        maxCapacity: category?.maxCapacity ?? null,
+      },
+      cycle: {
+        intervalMonths: cycle?.intervalMonths ?? 1,
+        multiplier: cycle?.multiplier ?? null,
+        fixedPoints: cycle?.fixedPoints ?? null,
+      },
+      capacity: row.capacity === "" ? null : Number(row.capacity),
+      coefficientOverride: override,
+    }),
+  };
+}
+
+/**
+ * 事業場に設置されている設備の一覧。
+ * 換算値算出フロー図のとおり、設備ごとに区分と周期を選び、点数を合算する。
+ */
+export function FacilityRows({
+  masters,
+  facilities,
+  onChange,
+}: {
+  masters: FormMasters;
+  facilities: FacilityFormValue[];
+  onChange: (next: FacilityFormValue[]) => void;
+}) {
+  const update = (uid: string, patch: Partial<FacilityFormValue>) =>
+    onChange(facilities.map((f) => (f.uid === uid ? { ...f, ...patch } : f)));
+
+  const changeCategory = (row: FacilityFormValue, categoryId: number) => {
+    const category = masters.categories.find((c) => c.id === categoryId);
+    update(row.uid, {
+      categoryId,
+      // 区分を変えると選べる周期も変わるので先頭に戻す
+      categoryCycleId: category?.cycles[0]?.id ?? 0,
+      coefficientMode: "auto",
+      coefficientOverride: "",
+      capacity: category?.capacityUnit === "none" ? "" : row.capacity,
+    });
+  };
+
+  return (
+    <div className="space-y-3">
+      {facilities.map((row, index) => {
+        const { category, cycle, coefficientRows, result } = facilityResult(
+          row,
+          masters,
+        );
+        const needsCapacity = category?.capacityUnit !== "none";
+        const isTable = category?.calculationMethod === "table";
+
+        return (
+          <div
+            key={row.uid}
+            className="rounded-md border border-line bg-canvas/40 p-3"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted">
+                設備 {index + 1}
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="tabular text-sm font-semibold">
+                  {formatPoints(result.points)} 点
+                </span>
+                {facilities.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      onChange(facilities.filter((f) => f.uid !== row.uid))
+                    }
+                    aria-label={`設備 ${index + 1} を削除`}
+                  >
+                    削除
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs text-muted">設備区分</label>
+                <Select
+                  value={row.categoryId}
+                  onChange={(e) => changeCategory(row, Number(e.target.value))}
+                >
+                  {(["demand", "generation", "other"] as const).map((group) => {
+                    const items = masters.categories.filter(
+                      (c) => c.categoryGroup === group,
+                    );
+                    if (items.length === 0) return null;
+                    return (
+                      <optgroup key={group} label={GROUP_LABEL[group]}>
+                        {items.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                </Select>
+              </div>
+
+              {needsCapacity && (
+                <div>
+                  <label className="mb-1 block text-xs text-muted">
+                    設備容量（{category?.capacityUnit}）
+                  </label>
+                  <Input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    inputMode="decimal"
+                    value={row.capacity}
+                    onChange={(e) => update(row.uid, { capacity: e.target.value })}
+                  />
+                  {result.capacityOutOfRange && (
+                    <p className="mt-1 text-xs text-warn">
+                      この区分の適用範囲（
+                      {category?.minCapacity != null && `${category.minCapacity}以上`}
+                      {category?.maxCapacity != null && `${category.maxCapacity}以下`}
+                      ）から外れています
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className={cn(!needsCapacity && "sm:col-span-2")}>
+                <label className="mb-1 block text-xs text-muted">点検周期</label>
+                <Select
+                  value={row.categoryCycleId}
+                  onChange={(e) =>
+                    update(row.uid, { categoryCycleId: Number(e.target.value) })
+                  }
+                >
+                  {category?.cycles.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.fixedPoints != null
+                        ? `（${c.fixedPoints} 点固定）`
+                        : c.multiplier != null
+                          ? `（×${c.multiplier}）`
+                          : ""}
+                    </option>
+                  ))}
+                </Select>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {cycle?.requiresInsulationMonitor && (
+                    <Badge tone="warn">絶縁監視装置 必須</Badge>
+                  )}
+                  {cycle?.conditionNote && <Badge>{cycle.conditionNote}</Badge>}
+                </div>
+              </div>
+
+              {isTable && (
+                <>
+                  <div>
+                    <label className="mb-1 block text-xs text-muted">換算係数</label>
+                    <Select
+                      value={row.coefficientMode}
+                      onChange={(e) =>
+                        update(row.uid, {
+                          coefficientMode: e.target
+                            .value as FacilityFormValue["coefficientMode"],
+                          coefficientOverride: "",
+                        })
+                      }
+                    >
+                      <option value="auto">容量から自動判定</option>
+                      <option value="select">係数表から選ぶ</option>
+                      <option value="manual">数値を直接入力</option>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs text-muted">
+                      {row.coefficientMode === "auto"
+                        ? "自動判定された係数"
+                        : "適用する係数"}
+                    </label>
+                    {row.coefficientMode === "select" ? (
+                      <Select
+                        value={row.coefficientOverride}
+                        onChange={(e) =>
+                          update(row.uid, { coefficientOverride: e.target.value })
+                        }
+                      >
+                        <option value="">選択してください</option>
+                        {coefficientRows.map((r) => (
+                          <option key={r.minCapacity} value={r.coefficient}>
+                            {r.minCapacity}
+                            {r.maxCapacity == null
+                              ? "以上"
+                              : `以上 ${r.maxCapacity}未満`}
+                            {` … ${r.coefficient}`}
+                          </option>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={
+                          row.coefficientMode === "auto"
+                            ? (result.base ?? "")
+                            : row.coefficientOverride
+                        }
+                        disabled={row.coefficientMode === "auto"}
+                        onChange={(e) =>
+                          update(row.uid, { coefficientOverride: e.target.value })
+                        }
+                      />
+                    )}
+                  </div>
+                </>
+              )}
+
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-xs text-muted">設備メモ</label>
+                <Input
+                  value={row.note}
+                  placeholder="非常用予備発電機の有無、絶縁監視装置の型式など"
+                  onChange={(e) => update(row.uid, { note: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {category?.note && (
+              <p className="mt-2 text-xs text-muted">{category.note}</p>
+            )}
+            {result.points == null && (
+              <p className="mt-2 text-xs text-warn">
+                {isTable
+                  ? "容量が係数表のレンジ外です。係数表から選ぶか、数値を直接入力してください。"
+                  : "この周期に点数が設定されていません。設定 → 設備区分で確認してください。"}
+              </p>
+            )}
+          </div>
+        );
+      })}
+
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onChange([...facilities, emptyFacility(masters)])}
+      >
+        ＋ 設備を追加
+      </Button>
+    </div>
+  );
+}

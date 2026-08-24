@@ -13,10 +13,10 @@ import {
   cn,
   formatDate,
   formatKm,
-  formatNumber,
   formatPoints,
   formatYen,
   splitPhones,
+  summarizeFacility,
 } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -98,7 +98,7 @@ export default async function CustomersPage({
 
       <Card className="overflow-hidden">
         <CustomerFilters
-          facilityTypes={masters.facilityTypes}
+          categories={masters.equipmentCategories}
           inspectionCycles={masters.inspectionCycles}
         />
 
@@ -111,18 +111,17 @@ export default async function CustomersPage({
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1200px] text-sm">
+            <table className="w-full min-w-[1560px] text-sm">
               <thead className="border-b border-line bg-canvas text-xs text-muted">
                 <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
-                  <th className="sticky-col left-0">
+                  <th className="sticky-col left-0 w-[4.5rem] min-w-[4.5rem] whitespace-nowrap">
                     <SortLink label="顧客ID" sortKey="code" sp={sp} />
                   </th>
-                  <th className="sticky-col sticky-col-shadow left-[4.5rem] min-w-52">
+                  <th className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 sm:w-52 sm:min-w-52">
                     <SortLink label="物件名称" sortKey="name" sp={sp} />
                   </th>
-                  <th>施設種別</th>
-                  <th className="text-right!">設備容量</th>
-                  <th>点検周期</th>
+                  <th className="w-72 min-w-72">設備</th>
+                  <th>訪問周期</th>
                   <th className="text-right!">
                     <SortLink label="保安管理点数" sortKey="points" sp={sp} />
                   </th>
@@ -154,10 +153,10 @@ export default async function CustomersPage({
                       !c.isActive && "text-muted opacity-70",
                     )}
                   >
-                    <td className="sticky-col left-0 px-2.5 py-2 font-mono text-xs">
+                    <td className="sticky-col left-0 w-[4.5rem] min-w-[4.5rem] px-2.5 py-2 font-mono text-xs whitespace-nowrap">
                       {c.code}
                     </td>
-                    <td className="sticky-col sticky-col-shadow left-[4.5rem] px-2.5 py-2">
+                    <td className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 px-2.5 py-2 sm:w-52 sm:min-w-52">
                       <Link
                         href={`/customers/${c.id}`}
                         className="font-medium text-brand hover:underline"
@@ -170,23 +169,32 @@ export default async function CustomersPage({
                         </Badge>
                       )}
                     </td>
-                    <td className="px-2.5 py-2 whitespace-nowrap">
-                      {c.facilityType?.name ?? "—"}
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-right whitespace-nowrap">
-                      {c.capacityKva != null && `${formatNumber(c.capacityKva)} kVA`}
-                      {c.capacityKva != null && c.capacityKw != null && " / "}
-                      {c.capacityKw != null && `${formatNumber(c.capacityKw)} kW`}
-                      {c.capacityKva == null && c.capacityKw == null && "—"}
+                    <td className="px-2.5 py-2 text-xs">
+                      {c.facilities.length === 0 ? (
+                        <Badge tone="warn">設備が未登録</Badge>
+                      ) : (
+                        c.facilities.map((f) => (
+                          <div key={f.id} className="whitespace-nowrap">
+                            {summarizeFacility(
+                              f.category?.name,
+                              f.capacity,
+                              f.category?.capacityUnit,
+                            )}
+                            <span className="ml-1 text-muted">
+                              / {f.cycle?.name ?? "—"} / {formatPoints(f.result.points)}点
+                            </span>
+                          </div>
+                        ))
+                      )}
                     </td>
                     <td className="px-2.5 py-2 whitespace-nowrap">
                       {c.inspectionCycle?.name ?? "—"}
                     </td>
                     <td className="tabular px-2.5 py-2 text-right">
                       {formatPoints(c.points)}
-                      {c.isPointsOverridden && (
+                      {c.facilities.some((f) => f.result.isOverridden) && (
                         <Badge tone="warn" className="ml-1">
-                          上書
+                          手動
                         </Badge>
                       )}
                     </td>
@@ -235,7 +243,7 @@ export default async function CustomersPage({
               </tbody>
               <tfoot className="border-t-2 border-line bg-canvas text-xs">
                 <tr className="[&>td]:px-2.5 [&>td]:py-2">
-                  <td colSpan={5} className="sticky-col left-0 font-medium">
+                  <td colSpan={4} className="sticky-col left-0 font-medium">
                     合計（稼働中 {summary.count} 件）
                   </td>
                   <td className="tabular text-right font-medium">

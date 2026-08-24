@@ -8,10 +8,10 @@ import type { ActiveFilter } from "@/lib/customer-filter";
 type Option = { id: number; name: string };
 
 export function CustomerFilters({
-  facilityTypes,
+  categories,
   inspectionCycles,
 }: {
-  facilityTypes: Option[];
+  categories: Option[];
   inspectionCycles: Option[];
 }) {
   const router = useRouter();
@@ -60,17 +60,17 @@ export function CustomerFilters({
         </Select>
       </div>
 
-      <div className="w-[calc(50%-0.25rem)] sm:w-44">
-        <label className="mb-1 block text-xs font-medium text-muted" htmlFor="ft">
-          施設種別
+      <div className="w-[calc(50%-0.25rem)] sm:w-64">
+        <label className="mb-1 block text-xs font-medium text-muted" htmlFor="cat">
+          設備区分
         </label>
         <Select
-          id="ft"
-          value={params.get("ft") ?? ""}
-          onChange={(e) => update("ft", e.target.value)}
+          id="cat"
+          value={params.get("cat") ?? ""}
+          onChange={(e) => update("cat", e.target.value)}
         >
           <option value="">すべて</option>
-          {facilityTypes.map((f) => (
+          {categories.map((f) => (
             <option key={f.id} value={f.id}>
               {f.name}
             </option>

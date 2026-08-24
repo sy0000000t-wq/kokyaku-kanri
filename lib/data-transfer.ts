@@ -10,7 +10,9 @@ export type ExportPayload = {
   settings: (typeof schema.settings.$inferSelect)[];
   coefficientTables: (typeof schema.coefficientTables.$inferSelect)[];
   coefficientRows: (typeof schema.coefficientRows.$inferSelect)[];
-  facilityTypes: (typeof schema.facilityTypes.$inferSelect)[];
+  equipmentCategories: (typeof schema.equipmentCategories.$inferSelect)[];
+  categoryCycles: (typeof schema.categoryCycles.$inferSelect)[];
+  customerFacilities: (typeof schema.customerFacilities.$inferSelect)[];
   inspectionCycles: (typeof schema.inspectionCycles.$inferSelect)[];
   billingCycles: (typeof schema.billingCycles.$inferSelect)[];
   customers: (typeof schema.customers.$inferSelect)[];
@@ -27,7 +29,9 @@ export function exportAll(): ExportPayload {
     settings: db.select().from(schema.settings).all(),
     coefficientTables: db.select().from(schema.coefficientTables).all(),
     coefficientRows: db.select().from(schema.coefficientRows).all(),
-    facilityTypes: db.select().from(schema.facilityTypes).all(),
+    equipmentCategories: db.select().from(schema.equipmentCategories).all(),
+    categoryCycles: db.select().from(schema.categoryCycles).all(),
+    customerFacilities: db.select().from(schema.customerFacilities).all(),
     inspectionCycles: db.select().from(schema.inspectionCycles).all(),
     billingCycles: db.select().from(schema.billingCycles).all(),
     customers: db.select().from(schema.customers).all(),
@@ -58,8 +62,11 @@ export function importAll(raw: unknown) {
     db.delete(schema.billingRecords).run();
     db.delete(schema.inspectionRecords).run();
     db.delete(schema.customerInspectionMonths).run();
+    // customer_facilities は customers と equipment_categories の両方を参照するので先に消す
+    db.delete(schema.customerFacilities).run();
     db.delete(schema.customers).run();
-    db.delete(schema.facilityTypes).run();
+    db.delete(schema.categoryCycles).run();
+    db.delete(schema.equipmentCategories).run();
     db.delete(schema.inspectionCycles).run();
     db.delete(schema.billingCycles).run();
     db.delete(schema.coefficientRows).run();
@@ -73,11 +80,13 @@ export function importAll(raw: unknown) {
     insert(schema.settings as never, payload.settings);
     insert(schema.coefficientTables as never, payload.coefficientTables);
     insert(schema.coefficientRows as never, payload.coefficientRows);
-    insert(schema.facilityTypes as never, payload.facilityTypes);
+    insert(schema.equipmentCategories as never, payload.equipmentCategories);
+    insert(schema.categoryCycles as never, payload.categoryCycles);
     insert(schema.inspectionCycles as never, payload.inspectionCycles);
     insert(schema.billingCycles as never, payload.billingCycles);
     insert(schema.customers as never, payload.customers);
     insert(schema.customerInspectionMonths as never, payload.customerInspectionMonths);
+    insert(schema.customerFacilities as never, payload.customerFacilities);
     insert(schema.inspectionRecords as never, payload.inspectionRecords);
     insert(schema.billingRecords as never, payload.billingRecords);
   });

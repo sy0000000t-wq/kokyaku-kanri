@@ -4,7 +4,7 @@ import * as schema from "./schema";
 import {
   seedBillingCycles,
   seedCoefficientTables,
-  seedFacilityTypes,
+  seedEquipmentCategories,
   seedInspectionCycles,
 } from "./seed-data";
 
@@ -64,28 +64,52 @@ export function seedMasters(db: DB) {
       .map((t) => [t.name, t.id] as const),
   );
 
-  // 施設種別
-  for (const [idx, ft] of seedFacilityTypes.entries()) {
+  // 設備区分と、区分ごとの点検周期
+  for (const [idx, category] of seedEquipmentCategories.entries()) {
     const found = db
       .select()
-      .from(schema.facilityTypes)
-      .where(eq(schema.facilityTypes.name, ft.name))
+      .from(schema.equipmentCategories)
+      .where(eq(schema.equipmentCategories.name, category.name))
       .get();
     if (found) continue;
 
-    db.insert(schema.facilityTypes)
+    const inserted = db
+      .insert(schema.equipmentCategories)
       .values({
-        name: ft.name,
-        capacityUnit: ft.capacityUnit,
-        coefficientTableId: tableIdByName.get(ft.table) ?? null,
-        secondaryCoefficientTableId: ft.secondaryTable
-          ? (tableIdByName.get(ft.secondaryTable) ?? null)
+        name: category.name,
+        categoryGroup: category.categoryGroup,
+        capacityUnit: category.capacityUnit,
+        calculationMethod: category.calculationMethod,
+        coefficientTableId: category.table
+          ? (tableIdByName.get(category.table) ?? null)
           : null,
+        minCapacity: category.minCapacity ?? null,
+        maxCapacity: category.maxCapacity ?? null,
+        note: category.note ?? "",
         sortOrder: idx,
         isActive: 1,
       })
+      .returning()
+      .get();
+
+    db.insert(schema.categoryCycles)
+      .values(
+        category.cycles.map((c, i) => ({
+          categoryId: inserted.id,
+          name: c.name,
+          intervalMonths: c.intervalMonths,
+          multiplier: c.multiplier ?? null,
+          fixedPoints: c.fixedPoints ?? null,
+          requiresInsulationMonitor: c.requiresInsulationMonitor ? 1 : 0,
+          conditionNote: c.conditionNote ?? "",
+          sortOrder: i,
+        })),
+      )
       .run();
-    log.push(`施設種別「${ft.name}」を追加しました`);
+
+    log.push(
+      `設備区分「${category.name}」を周期 ${category.cycles.length} 件とともに追加しました`,
+    );
   }
 
   // 点検周期
