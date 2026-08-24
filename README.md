@@ -7,11 +7,18 @@
 
 ## セットアップ
 
+Finder で **`start-mac.command` をダブルクリック**すると、必要な準備をしてから
+サーバーを起動し、ブラウザを開きます。停止はそのウィンドウで Control + C。
+
+ターミナルから動かす場合:
+
 ```bash
 npm install
 npm run db:migrate    # SQLite スキーマ作成 + 初期マスタ投入
-npm run dev           # http://localhost:3000
+npm run dev           # http://localhost:3100
 ```
+
+ポートは **3100** です（3000 は別プロジェクトが使っているため）。
 
 `npm run db:migrate` は何度実行しても安全です（スキーマは差分適用、マスタは未登録のものだけ追加）。
 
@@ -44,7 +51,9 @@ npm run db:seed:sample
 ipconfig getifaddr en0
 ```
 
-2. スマートフォンのブラウザで `http://<表示されたIP>:3000` を開く
+2. スマートフォンのブラウザで `http://<表示されたIP>:3100` を開く
+
+`start-mac.command` から起動した場合は、起動時にこの URL がそのまま表示されます。
 
 同じネットワーク（同じ Wi-Fi）に繋がっていること、Mac のファイアウォールが Node の着信を
 許可していることが条件です。現場では点検スケジュール画面の「当月の点検リスト」が主用途で、
