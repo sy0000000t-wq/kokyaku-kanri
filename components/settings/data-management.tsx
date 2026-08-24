@@ -6,7 +6,8 @@ import { downloadFile, toCsv } from "@/lib/csv";
 import { useStore } from "@/lib/store/context";
 import { parseDocument } from "@/lib/store/seed";
 import { getCustomerViews } from "@/lib/store/selectors";
-import { summarizeFacility, todayIso } from "@/lib/utils";
+import { formatDateTime, summarizeFacility, todayIso } from "@/lib/utils";
+import { DriveConnection } from "./drive-connection";
 
 /** データ管理：書き出しと取り込み */
 export function DataManagement() {
@@ -126,6 +127,8 @@ export function DataManagement() {
 
   return (
     <div className="space-y-4">
+      <DriveConnection />
+
       <Card>
         <CardHeader title="エクスポート" description="ブラウザにダウンロードされます" />
         <div className="flex flex-wrap gap-2 p-4">
@@ -189,7 +192,9 @@ export function DataManagement() {
           ))}
           <div className="flex justify-between px-4 py-2">
             <dt className="text-xs text-muted">最終更新</dt>
-            <dd className="tabular text-xs">{doc.savedAt}</dd>
+            <dd className="tabular text-xs">
+              {doc.savedAt ? formatDateTime(doc.savedAt) : "まだ保存されていません"}
+            </dd>
           </div>
         </dl>
       </Card>

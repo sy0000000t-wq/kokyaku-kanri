@@ -181,6 +181,13 @@ export function nextId<T extends { id: number }>(rows: T[]): number {
   return rows.reduce((max, r) => Math.max(max, r.id), 0) + 1;
 }
 
+/**
+ * 未保存を表す時刻。
+ * 生成のたびに現在時刻を入れると、サーバー描画とブラウザ描画で食い違って
+ * ハイドレーションが失敗するため、初期値は空にしておく。
+ */
+export const NOT_SAVED = "";
+
 export const defaultSettings = (): Settings => ({
   baseAddress: "",
   baseLat: null,
@@ -188,5 +195,5 @@ export const defaultSettings = (): Settings => ({
   googleMapsApiKey: null,
   taxRate: 0.1,
   distanceMode: "auto",
-  updatedAt: new Date().toISOString(),
+  updatedAt: NOT_SAVED,
 });

@@ -17,6 +17,12 @@ import {
   type DocumentBackend,
   type SaveResult,
 } from "./backend";
+import { DriveBackend } from "./drive-backend";
+import { GoogleAuth } from "./google-auth";
+
+const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+/** 前回ドライブに繋いでいたかどうか。次回は黙って繋ぎ直す */
+const DRIVE_FLAG = "denki-hoan-customer-manager:use-drive";
 
 export type StoreStatus =
   | "loading"
@@ -40,6 +46,13 @@ type StoreValue = {
   reload: () => Promise<void>;
   /** 文書を丸ごと差し替える（インポート） */
   replace: (doc: AppDocument) => void;
+  /** Google のクライアントIDが設定されているか */
+  driveAvailable: boolean;
+  /** いまドライブに繋がっているか */
+  driveConnected: boolean;
+  /** ドライブに繋ぐ。初回はファイルを作り、いまの内容を引き継ぐ */
+  connectDrive: () => Promise<void>;
+  disconnectDrive: () => void;
 };
 
 const StoreContext = createContext<StoreValue | null>(null);
@@ -60,7 +73,10 @@ export function StoreProvider({
   children: React.ReactNode;
   backend?: DocumentBackend;
 }) {
-  const backendRef = useRef<DocumentBackend>(backend ?? new LocalStorageBackend());
+  const localBackend = useRef<DocumentBackend>(new LocalStorageBackend());
+  const authRef = useRef<GoogleAuth | null>(null);
+  const backendRef = useRef<DocumentBackend>(backend ?? localBackend.current);
+  const [driveConnected, setDriveConnected] = useState(false);
   const [doc, setDoc] = useState<AppDocument>(() => createInitialDocument());
   const [status, setStatus] = useState<StoreStatus>("loading");
   const [message, setMessage] = useState<string | null>(null);
@@ -69,10 +85,30 @@ export function StoreProvider({
   const pendingRef = useRef<AppDocument | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 初回読み込み
+  // 初回読み込み。前回ドライブを使っていたら、画面を出さずに繋ぎ直す
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const wantsDrive =
+        CLIENT_ID !== "" && window.localStorage.getItem(DRIVE_FLAG) === "1";
+
+      if (wantsDrive) {
+        try {
+          const auth = new GoogleAuth(CLIENT_ID);
+          await auth.getToken(false);
+          authRef.current = auth;
+          backendRef.current = new DriveBackend(auth);
+          if (!cancelled) setDriveConnected(true);
+        } catch {
+          // 黙って繋げないときは、いったんローカルで開いて再サインインを促す
+          if (!cancelled) {
+            setMessage(
+              "Google の再サインインが必要です。設定 → データ管理から接続してください。",
+            );
+          }
+        }
+      }
+
       try {
         const loaded = await backendRef.current.load();
         if (cancelled) return;
@@ -181,6 +217,59 @@ export function StoreProvider({
     [scheduleSave],
   );
 
+  /**
+   * ドライブに繋ぐ。
+   * 向こうにファイルがあればそれを読み込み、無ければ今の内容で作る。
+   */
+  const connectDrive = useCallback(async () => {
+    if (!CLIENT_ID) {
+      setStatus("error");
+      setMessage("Google のクライアントIDが設定されていません");
+      return;
+    }
+
+    setStatus("loading");
+    setMessage(null);
+
+    try {
+      const auth = authRef.current ?? new GoogleAuth(CLIENT_ID);
+      const drive = new DriveBackend(auth);
+      await drive.ensureSignedIn();
+
+      const loaded = await drive.load();
+      if (loaded) {
+        setDoc(loaded.doc);
+        revisionRef.current = loaded.revision;
+      } else {
+        // 初回：いま手元にある内容をそのままドライブへ移す
+        const result = await drive.save(doc, null);
+        if (result.status === "error") throw new Error(result.message);
+        revisionRef.current =
+          result.status === "saved" ? result.revision : revisionRef.current;
+      }
+
+      authRef.current = auth;
+      backendRef.current = drive;
+      window.localStorage.setItem(DRIVE_FLAG, "1");
+      setDriveConnected(true);
+      setStatus("ready");
+    } catch (e) {
+      setStatus("error");
+      setMessage(`ドライブに繋げませんでした: ${(e as Error).message}`);
+    }
+  }, [doc]);
+
+  const disconnectDrive = useCallback(() => {
+    authRef.current?.signOut();
+    authRef.current = null;
+    backendRef.current = localBackend.current;
+    revisionRef.current = null;
+    window.localStorage.removeItem(DRIVE_FLAG);
+    setDriveConnected(false);
+    setStatus("ready");
+    setMessage(null);
+  }, []);
+
   // 未保存のまま離脱しないようにする
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -198,13 +287,29 @@ export function StoreProvider({
       indexes,
       status,
       message,
-      backendName: backendRef.current.name,
+      backendName: driveConnected ? "Google ドライブ" : "このブラウザ",
       update,
       updateWith,
       reload,
       replace,
+      driveAvailable: CLIENT_ID !== "",
+      driveConnected,
+      connectDrive,
+      disconnectDrive,
     }),
-    [doc, indexes, status, message, update, updateWith, reload, replace],
+    [
+      doc,
+      indexes,
+      status,
+      message,
+      update,
+      updateWith,
+      reload,
+      replace,
+      driveConnected,
+      connectDrive,
+      disconnectDrive,
+    ],
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

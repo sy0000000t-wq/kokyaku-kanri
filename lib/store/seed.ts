@@ -6,6 +6,7 @@ import {
 } from "@/db/seed-data";
 import {
   DOCUMENT_VERSION,
+  NOT_SAVED,
   defaultSettings,
   type AppDocument,
   type CategoryCycle,
@@ -15,7 +16,7 @@ import {
 } from "./document";
 
 /** マスタだけ入った、顧客ゼロの初期文書を作る */
-export function createInitialDocument(now = new Date()): AppDocument {
+export function createInitialDocument(): AppDocument {
   const coefficientTables: CoefficientTable[] = [];
   const coefficientRows: CoefficientRow[] = [];
   let tableId = 0;
@@ -85,7 +86,7 @@ export function createInitialDocument(now = new Date()): AppDocument {
 
   return {
     version: DOCUMENT_VERSION,
-    savedAt: now.toISOString(),
+    savedAt: NOT_SAVED,
     settings: defaultSettings(),
     coefficientTables,
     coefficientRows,
