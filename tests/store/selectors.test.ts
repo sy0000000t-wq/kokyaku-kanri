@@ -1,0 +1,221 @@
+import { describe, expect, it } from "vitest";
+import { createInitialDocument, parseDocument } from "@/lib/store/seed";
+import {
+  buildIndexes,
+  getCustomerViews,
+  summarizeCustomers,
+} from "@/lib/store/selectors";
+import type { AppDocument, Customer } from "@/lib/store/document";
+
+const CATEGORY = {
+  demandOver100: "需要設備（高圧・100kVA超過）",
+  solarSelf: "太陽電池発電所（自家消費）",
+  solarSell: "太陽電池発電所（全量売電）",
+  thermal: "火力発電所（ディーゼル・ガスタービン等）",
+};
+
+function customer(overrides: Partial<Customer> = {}): Customer {
+  return {
+    id: 1,
+    code: "T01",
+    name: "テスト事業場",
+    inspectionCycleId: 2,
+    monthlyFee: 17500,
+    annualFeeHandling: "included",
+    annualInspectionFee: null,
+    unitPriceOverride: null,
+    address: "愛知県",
+    lat: null,
+    lng: null,
+    distanceKm: null,
+    durationMin: null,
+    distanceMethod: null,
+    distanceUpdatedAt: null,
+    phone: "",
+    email: "",
+    contactPerson: "",
+    contractStartDate: "2026-03-01",
+    contractEndDate: null,
+    annualInspectionMonth: 3,
+    annualInspectionDay: null,
+    billingCycleId: 1,
+    paymentLagMonths: 1,
+    isActive: 1,
+    note: "",
+    createdAt: "2026-03-01T00:00:00.000Z",
+    updatedAt: "2026-03-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+/** 区分名と周期名を指定して設備を1件足す */
+function addFacility(
+  doc: AppDocument,
+  customerId: number,
+  categoryName: string,
+  cycleName: string,
+  capacity: number | null,
+) {
+  const category = doc.equipmentCategories.find((c) => c.name === categoryName);
+  if (!category) throw new Error(`設備区分が見つかりません: ${categoryName}`);
+  const cycle = doc.categoryCycles.find(
+    (c) => c.categoryId === category.id && c.name === cycleName,
+  );
+  if (!cycle) throw new Error(`周期が見つかりません: ${cycleName}`);
+
+  doc.customerFacilities.push({
+    id: doc.customerFacilities.length + 1,
+    customerId,
+    categoryId: category.id,
+    categoryCycleId: cycle.id,
+    capacity,
+    coefficientOverride: null,
+    note: "",
+    sortOrder: doc.customerFacilities.filter((f) => f.customerId === customerId).length,
+  });
+}
+
+describe("createInitialDocument", () => {
+  it("マスタが一式そろっている", () => {
+    const doc = createInitialDocument();
+    expect(doc.coefficientTables).toHaveLength(2);
+    expect(doc.coefficientRows).toHaveLength(24);
+    expect(doc.equipmentCategories).toHaveLength(11);
+    expect(doc.inspectionCycles.length).toBeGreaterThan(0);
+    expect(doc.billingCycles).toHaveLength(5);
+    expect(doc.customers).toHaveLength(0);
+  });
+
+  it("設備区分には必ず周期がぶら下がっている", () => {
+    const doc = createInitialDocument();
+    for (const category of doc.equipmentCategories) {
+      const cycles = doc.categoryCycles.filter((c) => c.categoryId === category.id);
+      expect(cycles.length, category.name).toBeGreaterThan(0);
+    }
+  });
+
+  it("係数表を引く区分にはテーブルが紐づいている", () => {
+    const doc = createInitialDocument();
+    for (const c of doc.equipmentCategories.filter(
+      (c) => c.calculationMethod === "table",
+    )) {
+      expect(c.coefficientTableId, c.name).not.toBeNull();
+    }
+  });
+});
+
+describe("getCustomerViews（換算値算出フロー図の参考例）", () => {
+  it("参考例1：需要設備300kVA 2ヶ月 + 太陽光80kW 自家消費 6ヶ月 = 0.555 点", () => {
+    const doc = createInitialDocument();
+    doc.customers.push(customer());
+    addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 300);
+    addFacility(doc, 1, CATEGORY.solarSelf, "6ヶ月に1回", 80);
+
+    const view = getCustomerViews(doc, buildIndexes(doc))[0];
+    expect(view.facilities.map((f) => f.result.points)).toEqual([0.48, 0.075]);
+    expect(view.points).toBe(0.555);
+  });
+
+  it("参考例2：需要設備550kVA + ディーゼル80kW + 太陽光100kW全量売電 = 1.152 点", () => {
+    const doc = createInitialDocument();
+    doc.customers.push(customer());
+    addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 550);
+    addFacility(doc, 1, CATEGORY.thermal, "月1回", 80);
+    addFacility(doc, 1, CATEGORY.solarSell, "3ヶ月に1回", 100);
+
+    const view = getCustomerViews(doc, buildIndexes(doc))[0];
+    expect(view.facilities.map((f) => f.result.points)).toEqual([0.72, 0.3, 0.132]);
+    expect(view.points).toBe(1.152);
+  });
+});
+
+describe("getCustomerViews（既存シートとの一致）", () => {
+  it("A社（サンプル）相当：210kVA 隔月 → 0.48 点 / 年額210,000 / 点数単価36,458", () => {
+    const doc = createInitialDocument();
+    doc.customers.push(customer({ monthlyFee: 17500 }));
+    addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 210);
+
+    const view = getCustomerViews(doc, buildIndexes(doc))[0];
+    expect(view.points).toBe(0.48);
+    expect(view.pricing.annualExcl).toBe(210000);
+    expect(view.pricing.unitPrice).toBe(36458);
+  });
+
+  it("B社（サンプル）相当：530kVA 隔月 別途40,000 → 0.60 点 / 点数単価28,889", () => {
+    const doc = createInitialDocument();
+    doc.customers.push(
+      customer({
+        monthlyFee: 14000,
+        annualFeeHandling: "separate",
+        annualInspectionFee: 40000,
+      }),
+    );
+    addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 530);
+
+    const view = getCustomerViews(doc, buildIndexes(doc))[0];
+    expect(view.points).toBe(0.6);
+    expect(view.pricing.annualExcl).toBe(208000);
+    expect(view.pricing.unitPrice).toBe(28889);
+  });
+});
+
+describe("summarizeCustomers", () => {
+  it("解除済みは集計に含めない", () => {
+    const doc = createInitialDocument();
+    doc.customers.push(customer({ id: 1, code: "T01" }));
+    doc.customers.push(customer({ id: 2, code: "T02", isActive: 0, monthlyFee: 99999 }));
+    addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 210);
+    addFacility(doc, 2, CATEGORY.demandOver100, "2ヶ月に1回", 210);
+
+    const summary = summarizeCustomers(getCustomerViews(doc, buildIndexes(doc)));
+    expect(summary.count).toBe(1);
+    expect(summary.monthlyExcl).toBe(17500);
+    expect(summary.points).toBe(0.48);
+  });
+});
+
+describe("parseDocument", () => {
+  it("SQLite 版のエクスポート（settings が配列）をそのまま読める", () => {
+    const initial = createInitialDocument();
+    const v1 = {
+      version: 1,
+      exportedAt: "2026-08-24T00:00:00.000Z",
+      settings: [
+        {
+          id: 1,
+          baseAddress: "愛知県豊田市",
+          baseLat: 35.1,
+          baseLng: 137.1,
+          googleMapsApiKey: null,
+          taxRate: 0.1,
+          distanceMode: "auto",
+          updatedAt: "2026-08-24T00:00:00.000Z",
+        },
+      ],
+      coefficientTables: initial.coefficientTables,
+      coefficientRows: initial.coefficientRows,
+      equipmentCategories: initial.equipmentCategories,
+      categoryCycles: initial.categoryCycles,
+      inspectionCycles: initial.inspectionCycles,
+      billingCycles: initial.billingCycles,
+      customers: [customer()],
+      customerFacilities: [],
+      customerInspectionMonths: [{ customerId: 1, month: 3 }],
+      inspectionRecords: [],
+      billingRecords: [],
+    };
+
+    const doc = parseDocument(v1);
+    expect(doc.version).toBe(2);
+    expect(doc.settings.baseAddress).toBe("愛知県豊田市");
+    expect(doc.settings.taxRate).toBe(0.1);
+    expect(doc.customers).toHaveLength(1);
+    expect(doc.customerInspectionMonths).toEqual([{ customerId: 1, month: 3 }]);
+  });
+
+  it("形式が違うものは弾く", () => {
+    expect(() => parseDocument(null)).toThrow();
+    expect(() => parseDocument({ hello: "world" })).toThrow();
+    expect(() => parseDocument({ customers: "not an array" })).toThrow();
+  });
+});
