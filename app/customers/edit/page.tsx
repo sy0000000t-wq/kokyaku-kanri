@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { CustomerForm } from "@/components/customers/customer-form";
 import { Badge, Card, EmptyState } from "@/components/ui";
 import { useStore } from "@/lib/store/context";
@@ -9,11 +10,12 @@ import { toFormMasters } from "@/lib/store/form-masters";
 import { getCustomerView } from "@/lib/store/selectors";
 import { formatDate } from "@/lib/utils";
 
-export default function EditCustomerPage() {
-  const params = useParams<{ id: string }>();
+function EditCustomerPageInner() {
+  // 静的サイトではパスに ID を埋め込めないので、クエリで受け取る
+  const params = useSearchParams();
   const { doc, indexes, status } = useStore();
 
-  const customer = getCustomerView(doc, indexes, Number(params.id));
+  const customer = getCustomerView(doc, indexes, Number(params.get("id")));
 
   if (!customer) {
     return (
@@ -92,5 +94,13 @@ export default function EditCustomerPage() {
         }}
       />
     </div>
+  );
+}
+
+export default function EditCustomerPage() {
+  return (
+    <Suspense fallback={<p className="p-4 text-sm text-muted">読み込んでいます…</p>}>
+      <EditCustomerPageInner />
+    </Suspense>
   );
 }

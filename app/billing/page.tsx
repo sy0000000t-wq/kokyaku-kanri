@@ -143,7 +143,7 @@ function BillingPageInner() {
                       </td>
                       <td className="sticky-col sticky-col-shadow left-[4.5rem] px-2.5 py-1.5">
                         <Link
-                          href={`/customers/${c.id}`}
+                          href={`/customers/edit?id=${c.id}`}
                           className="font-medium text-brand hover:underline"
                         >
                           {c.name}
@@ -274,7 +274,7 @@ function BillingPageInner() {
                   <tr key={cell.customer.id} className="border-b border-line last:border-0">
                     <td className="px-2.5 py-2">
                       <Link
-                        href={`/customers/${cell.customer.id}`}
+                        href={`/customers/edit?id=${cell.customer.id}`}
                         className="font-medium text-brand hover:underline"
                       >
                         {cell.customer.name}

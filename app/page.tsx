@@ -112,7 +112,7 @@ function DashboardPageInner() {
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <Link
-                        href={`/customers/${cell.customer.id}`}
+                        href={`/customers/edit?id=${cell.customer.id}`}
                         className="text-sm font-medium text-brand hover:underline"
                       >
                         {cell.customer.name}
@@ -166,7 +166,7 @@ function DashboardPageInner() {
                 >
                   <div>
                     <Link
-                      href={`/customers/${u.customer.id}`}
+                      href={`/customers/edit?id=${u.customer.id}`}
                       className="text-sm font-medium text-brand hover:underline"
                     >
                       {u.customer.name}

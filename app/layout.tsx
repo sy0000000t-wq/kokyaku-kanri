@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import "./globals.css";
 import { MainNav } from "@/components/main-nav";
 import { ToastProvider } from "@/components/toast";
@@ -30,6 +31,14 @@ export default function RootLayout({
             <main className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-5 sm:py-6">
               {children}
             </main>
+            <footer className="no-print mx-auto w-full max-w-[1400px] px-3 pb-6 sm:px-5">
+              <p className="border-t border-line pt-3 text-xs text-muted">
+                電気保安管理 顧客管理ツール ｜{" "}
+                <Link href="/privacy" className="underline hover:text-ink">
+                  プライバシーポリシー
+                </Link>
+              </p>
+            </footer>
           </ToastProvider>
         </StoreProvider>
       </body>

@@ -152,7 +152,7 @@ function CustomersPageInner() {
                     </td>
                     <td className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 px-2.5 py-2 sm:w-52 sm:min-w-52">
                       <Link
-                        href={`/customers/${c.id}`}
+                        href={`/customers/edit?id=${c.id}`}
                         className="font-medium text-brand hover:underline"
                       >
                         {c.name}
