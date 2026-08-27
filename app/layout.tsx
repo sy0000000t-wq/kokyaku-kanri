@@ -4,16 +4,20 @@ import "./globals.css";
 import { MainNav } from "@/components/main-nav";
 import { ToastProvider } from "@/components/toast";
 import { StoreProvider } from "@/lib/store/context";
+import { ServiceWorkerRegistration } from "@/components/service-worker";
 import { StoreStatusBar } from "@/components/store-status-bar";
 
 export const metadata: Metadata = {
   title: "顧客管理 | 電気保安管理",
   description: "電気保安管理業務の顧客・点検スケジュール・請求入金を管理する",
+  manifest: `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/manifest.json`,
+  appleWebApp: { capable: true, title: "顧客管理", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  themeColor: "#2f6fd0",
 };
 
 export default function RootLayout({
@@ -24,6 +28,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className="min-h-dvh">
+        <ServiceWorkerRegistration />
         <StoreProvider>
           <ToastProvider>
             <MainNav />

@@ -5,7 +5,7 @@ import { useStore } from "@/lib/store/context";
 
 /**
  * 保存状態の表示。
- * ふだんは何も出さず、競合・エラー・読み込み中だけ知らせる。
+ * ふだんは何も出さず、圏外・競合・エラーだけ知らせる。
  */
 export function StoreStatusBar() {
   const { status, message, reload, backendName } = useStore();
@@ -23,14 +23,22 @@ export function StoreStatusBar() {
   const tone =
     status === "conflict"
       ? "border-warn/40 bg-warn-soft text-warn"
-      : "border-danger/40 bg-danger-soft text-danger";
+      : status === "offline"
+        ? "border-brand/30 bg-brand-soft text-brand"
+        : "border-danger/40 bg-danger-soft text-danger";
 
   return (
-    <div className={`no-print flex flex-wrap items-center gap-3 border-b px-4 py-2 text-xs ${tone}`}>
+    <div
+      className={`no-print flex flex-wrap items-center gap-3 border-b px-4 py-2 text-xs ${tone}`}
+      role="status"
+    >
+      <span className="font-medium">
+        {status === "offline" ? "オフライン" : status === "conflict" ? "競合" : "エラー"}
+      </span>
       <span>{message}</span>
       {status === "conflict" && (
         <Button size="sm" variant="outline" onClick={() => void reload()}>
-          読み込み直す
+          ドライブの内容を読み込み直す
         </Button>
       )}
     </div>

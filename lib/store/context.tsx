@@ -28,6 +28,8 @@ export type StoreStatus =
   | "loading"
   | "ready"
   | "saving"
+  /** 圏外。変更は端末内に貯めてあり、繋がったら送る */
+  | "offline"
   | "conflict"
   | "error";
 
@@ -84,6 +86,7 @@ export function StoreProvider({
   const revisionRef = useRef<string | null>(null);
   const pendingRef = useRef<AppDocument | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
 
   // 初回読み込み。前回ドライブを使っていたら、画面を出さずに繋ぎ直す
   useEffect(() => {
@@ -115,6 +118,28 @@ export function StoreProvider({
         if (loaded) {
           setDoc(loaded.doc);
           revisionRef.current = loaded.revision;
+
+          if (loaded.conflictWithLocal) {
+            setStatus("conflict");
+            setMessage(
+              "オフライン中の変更と、ほかの端末での更新が競合しています。ドライブ側の内容を表示しています。",
+            );
+            return;
+          }
+          if (loaded.offline) {
+            setStatus("offline");
+            setMessage(
+              loaded.pendingLocalChanges
+                ? "オフラインです。未送信の変更があります。接続が戻ると自動で送信します。"
+                : "オフラインです。この端末に保存された内容を表示しています。",
+            );
+            return;
+          }
+          if (loaded.pendingLocalChanges) {
+            // 圏外中の変更が残っている。すぐ送る
+            pendingRef.current = loaded.doc;
+            void flushRef.current?.();
+          }
         }
         setStatus("ready");
       } catch (e) {
@@ -147,6 +172,11 @@ export function StoreProvider({
       revisionRef.current = result.revision;
       setStatus("ready");
       setMessage(null);
+    } else if (result.status === "offline") {
+      // 端末内には残っているので、繋がったときに送り直す
+      pendingRef.current = next;
+      setStatus("offline");
+      setMessage("オフラインです。変更はこの端末に保存され、接続が戻ったら送信します。");
     } else if (result.status === "conflict") {
       setStatus("conflict");
       setMessage(
@@ -156,6 +186,20 @@ export function StoreProvider({
       setStatus("error");
       setMessage(result.message);
     }
+  }, []);
+
+  // 初回読み込みの中からも呼べるようにしておく
+  useEffect(() => {
+    flushRef.current = flush;
+  }, [flush]);
+
+  // 接続が戻ったら、貯めていた変更を送る
+  useEffect(() => {
+    const onOnline = () => {
+      if (pendingRef.current) void flushRef.current?.();
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
   }, []);
 
   const scheduleSave = useCallback(

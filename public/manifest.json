@@ -1,0 +1,19 @@
+{
+  "name": "電気保安管理 顧客管理ツール",
+  "short_name": "顧客管理",
+  "description": "保安管理契約物件の顧客・点検スケジュール・請求入金を管理します",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8fa",
+  "theme_color": "#2f6fd0",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

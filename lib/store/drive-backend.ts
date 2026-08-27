@@ -1,6 +1,7 @@
 import type { AppDocument } from "./document";
 import { parseDocument } from "./seed";
 import type { DocumentBackend, LoadResult, SaveResult } from "./backend";
+import { isOfflineError, readMirror, writeMirror } from "./offline";
 import type { GoogleAuth } from "./google-auth";
 
 /** ドライブ上のファイル名。ユーザーからも見える場所に置く */
@@ -75,17 +76,44 @@ export class DriveBackend implements DocumentBackend {
   }
 
   async load(): Promise<LoadResult | null> {
-    const file = await this.findFile();
-    if (!file) return null;
-    this.fileId = file.id;
+    try {
+      const file = await this.findFile();
+      if (!file) return null;
+      this.fileId = file.id;
 
-    const res = await this.fetchWithAuth(
-      `${DRIVE_API}/files/${file.id}?alt=media`,
-    );
-    if (!res.ok) await this.describe("データファイルを読み込めませんでした", res);
+      const res = await this.fetchWithAuth(
+        `${DRIVE_API}/files/${file.id}?alt=media`,
+      );
+      if (!res.ok) await this.describe("データファイルを読み込めませんでした", res);
 
-    const doc = parseDocument(await res.json());
-    return { doc, revision: file.version ?? null };
+      const doc = parseDocument(await res.json());
+      const revision = file.version ?? null;
+
+      const mirror = readMirror();
+      if (mirror?.pending) {
+        // 圏外中に変えた分がまだ残っている。ドライブ側が進んでいなければ手元を優先する
+        if (mirror.revision === revision) {
+          return { doc: mirror.doc, revision, pendingLocalChanges: true };
+        }
+        // 両方進んでいる＝競合。ドライブ側を返し、判断は呼び出し側に任せる
+        return { doc, revision, conflictWithLocal: true };
+      }
+
+      writeMirror(doc, revision, false);
+      return { doc, revision };
+    } catch (e) {
+      // 圏外なら手元の控えで開く
+      const mirror = readMirror();
+      if (mirror && isOfflineError(e)) {
+        return {
+          doc: mirror.doc,
+          revision: mirror.revision,
+          offline: true,
+          pendingLocalChanges: mirror.pending,
+        };
+      }
+      throw e;
+    }
   }
 
   /** いま保存先にある版を調べる */
@@ -99,6 +127,9 @@ export class DriveBackend implements DocumentBackend {
   }
 
   async save(doc: AppDocument, expectedRevision: string | null): Promise<SaveResult> {
+    // 送れたかに関わらず、まず手元に残す（圏外でも失われないように）
+    writeMirror(doc, expectedRevision, true);
+
     try {
       if (!this.fileId) {
         const found = await this.findFile();
@@ -110,6 +141,7 @@ export class DriveBackend implements DocumentBackend {
       if (!this.fileId) {
         const created = await this.create(body);
         this.fileId = created.id;
+        writeMirror(doc, created.version ?? null, false);
         return { status: "saved", revision: created.version ?? null };
       }
 
@@ -132,8 +164,11 @@ export class DriveBackend implements DocumentBackend {
       if (!res.ok) await this.describe("保存できませんでした", res);
 
       const saved = (await res.json()) as DriveFile;
+      writeMirror(doc, saved.version ?? null, false);
       return { status: "saved", revision: saved.version ?? null };
     } catch (e) {
+      // 圏外は失敗ではなく「あとで送る」
+      if (isOfflineError(e)) return { status: "offline" };
       return { status: "error", message: (e as Error).message };
     }
   }

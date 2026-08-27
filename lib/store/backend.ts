@@ -21,11 +21,19 @@ export type LoadResult = {
   doc: AppDocument;
   /** 保存先が持つ版。競合検出に使う */
   revision: string | null;
+  /** 通信できず、端末内の控えで開いた */
+  offline?: boolean;
+  /** まだ送れていない変更が手元にある */
+  pendingLocalChanges?: boolean;
+  /** 手元とドライブの両方が進んでいる */
+  conflictWithLocal?: boolean;
 };
 
 export type SaveResult =
   | { status: "saved"; revision: string | null }
   | { status: "conflict"; revision: string | null }
+  /** 通信できないので送れていない。端末内には残っている */
+  | { status: "offline" }
   | { status: "error"; message: string };
 
 const STORAGE_KEY = "denki-hoan-customer-manager:document";
