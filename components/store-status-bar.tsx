@@ -8,7 +8,7 @@ import { useStore } from "@/lib/store/context";
  * ふだんは何も出さず、圏外・競合・エラーだけ知らせる。
  */
 export function StoreStatusBar() {
-  const { status, message, reload, backendName } = useStore();
+  const { status, message, reload, backendName, connectDrive } = useStore();
 
   if (status === "ready" || status === "saving") return null;
 
@@ -25,20 +25,34 @@ export function StoreStatusBar() {
       ? "border-warn/40 bg-warn-soft text-warn"
       : status === "offline"
         ? "border-brand/30 bg-brand-soft text-brand"
-        : "border-danger/40 bg-danger-soft text-danger";
+        : status === "signin"
+          ? "border-warn/40 bg-warn-soft text-warn"
+          : "border-danger/40 bg-danger-soft text-danger";
+
+  const label =
+    status === "offline"
+      ? "オフライン"
+      : status === "conflict"
+        ? "競合"
+        : status === "signin"
+          ? "サインインが必要"
+          : "エラー";
 
   return (
     <div
       className={`no-print flex flex-wrap items-center gap-3 border-b px-4 py-2 text-xs ${tone}`}
       role="status"
     >
-      <span className="font-medium">
-        {status === "offline" ? "オフライン" : status === "conflict" ? "競合" : "エラー"}
-      </span>
+      <span className="font-medium">{label}</span>
       <span>{message}</span>
       {status === "conflict" && (
         <Button size="sm" variant="outline" onClick={() => void reload()}>
           ドライブの内容を読み込み直す
+        </Button>
+      )}
+      {status === "signin" && (
+        <Button size="sm" variant="outline" onClick={() => void connectDrive()}>
+          サインインし直す
         </Button>
       )}
     </div>

@@ -34,17 +34,23 @@ export class DriveBackend implements DocumentBackend {
     init: RequestInit = {},
     interactive = false,
   ): Promise<Response> {
-    const token = await this.auth.getToken(interactive);
-    const res = await fetch(url, {
-      ...init,
-      headers: {
-        ...(init.headers ?? {}),
-        Authorization: `Bearer ${token.accessToken}`,
-      },
-    });
+    const send = async (token: string) =>
+      fetch(url, {
+        ...init,
+        headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
+      });
+
+    let token = await this.auth.getToken(interactive);
+    let res = await send(token.accessToken);
 
     if (res.status === 401) {
-      throw new Error("ログインの有効期限が切れました。もう一度サインインしてください");
+      // 保持していたトークンが失効していた。捨てて取り直す
+      this.auth.invalidate();
+      token = await this.auth.getToken(interactive);
+      res = await send(token.accessToken);
+      if (res.status === 401) {
+        throw new Error("ログインの有効期限が切れました。もう一度サインインしてください");
+      }
     }
     return res;
   }
@@ -102,13 +108,14 @@ export class DriveBackend implements DocumentBackend {
       writeMirror(doc, revision, false);
       return { doc, revision };
     } catch (e) {
-      // 圏外なら手元の控えで開く
+      // 読めなかったときは、手元の控えがあればそれで開く。
+      // ここで諦めると圏外や期限切れのたびにデータが消えたように見えてしまう。
       const mirror = readMirror();
-      if (mirror && isOfflineError(e)) {
+      if (mirror) {
         return {
           doc: mirror.doc,
           revision: mirror.revision,
-          offline: true,
+          degraded: isOfflineError(e) ? "offline" : "signin",
           pendingLocalChanges: mirror.pending,
         };
       }

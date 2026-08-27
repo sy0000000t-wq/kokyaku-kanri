@@ -21,8 +21,8 @@ export type LoadResult = {
   doc: AppDocument;
   /** 保存先が持つ版。競合検出に使う */
   revision: string | null;
-  /** 通信できず、端末内の控えで開いた */
-  offline?: boolean;
+  /** 端末内の控えで開いた理由。通信不能か、サインインが切れたか */
+  degraded?: "offline" | "signin";
   /** まだ送れていない変更が手元にある */
   pendingLocalChanges?: boolean;
   /** 手元とドライブの両方が進んでいる */

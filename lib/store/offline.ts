@@ -65,5 +65,7 @@ export function clearMirror() {
 export function isOfflineError(e: unknown): boolean {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
   const message = e instanceof Error ? e.message : String(e);
-  return /Failed to fetch|NetworkError|Load failed|ネットワーク/i.test(message);
+  return /Failed to fetch|NetworkError|Load failed|ネットワーク|ログイン用スクリプトを読み込めませんでした/i.test(
+    message,
+  );
 }

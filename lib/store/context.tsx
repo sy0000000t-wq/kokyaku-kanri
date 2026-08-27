@@ -18,6 +18,7 @@ import {
   type SaveResult,
 } from "./backend";
 import { DriveBackend } from "./drive-backend";
+import { clearMirror } from "./offline";
 import { GoogleAuth } from "./google-auth";
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
@@ -30,6 +31,8 @@ export type StoreStatus =
   | "saving"
   /** 圏外。変更は端末内に貯めてあり、繋がったら送る */
   | "offline"
+  /** 通信はできるがトークンが取れない。再サインインが要る */
+  | "signin"
   | "conflict"
   | "error";
 
@@ -96,20 +99,13 @@ export function StoreProvider({
         CLIENT_ID !== "" && window.localStorage.getItem(DRIVE_FLAG) === "1";
 
       if (wantsDrive) {
-        try {
-          const auth = new GoogleAuth(CLIENT_ID);
-          await auth.getToken(false);
-          authRef.current = auth;
-          backendRef.current = new DriveBackend(auth);
-          if (!cancelled) setDriveConnected(true);
-        } catch {
-          // 黙って繋げないときは、いったんローカルで開いて再サインインを促す
-          if (!cancelled) {
-            setMessage(
-              "Google の再サインインが必要です。設定 → データ管理から接続してください。",
-            );
-          }
-        }
+        // ここでトークンを取りに行かない。圏外だと必ず失敗し、
+        // ドライブ接続そのものを諦めてしまうため。
+        // トークンは実際に通信するときに取り、失敗したら端末内の控えで開く。
+        const auth = new GoogleAuth(CLIENT_ID);
+        authRef.current = auth;
+        backendRef.current = new DriveBackend(auth);
+        if (!cancelled) setDriveConnected(true);
       }
 
       try {
@@ -126,7 +122,14 @@ export function StoreProvider({
             );
             return;
           }
-          if (loaded.offline) {
+          if (loaded.degraded === "signin") {
+            setStatus("signin");
+            setMessage(
+              "Google の再サインインが必要です。表示しているのはこの端末に保存された内容です。",
+            );
+            return;
+          }
+          if (loaded.degraded === "offline") {
             setStatus("offline");
             setMessage(
               loaded.pendingLocalChanges
@@ -309,10 +312,16 @@ export function StoreProvider({
     backendRef.current = localBackend.current;
     revisionRef.current = null;
     window.localStorage.removeItem(DRIVE_FLAG);
+    clearMirror();
     setDriveConnected(false);
     setStatus("ready");
     setMessage(null);
-  }, []);
+    // いまの内容を端末内保存へ引き継ぐ。そうしないと解除した瞬間に空に見える
+    setDoc((current) => {
+      scheduleSave(current);
+      return current;
+    });
+  }, [scheduleSave]);
 
   // 未保存のまま離脱しないようにする
   useEffect(() => {

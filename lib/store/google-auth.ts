@@ -65,9 +65,49 @@ export type GoogleToken = {
   expiresAt: number;
 };
 
+/**
+ * トークンの控え。
+ * 「黙って取り直す」は Google のセッションやブラウザの Cookie 制限（特に iOS）で
+ * オンラインでも失敗するため、有効なうちは端末に持っておき、
+ * 開き直しただけで再サインインを求められないようにする。
+ *
+ * 権限は drive.file（このアプリが作ったファイルのみ）で寿命も1時間程度。
+ * サインアウト時と失効時には必ず消す。
+ */
+const TOKEN_KEY = "denki-hoan-customer-manager:token";
+
+function loadStoredToken(): GoogleToken | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(TOKEN_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as GoogleToken;
+    if (typeof parsed.accessToken !== "string" || typeof parsed.expiresAt !== "number") {
+      return null;
+    }
+    if (parsed.expiresAt <= Date.now()) {
+      window.localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function storeToken(token: GoogleToken | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (token) window.localStorage.setItem(TOKEN_KEY, JSON.stringify(token));
+    else window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // 保存できなくても動作は続けられる
+  }
+}
+
 export class GoogleAuth {
   private client: TokenClient | null = null;
-  private token: GoogleToken | null = null;
+  private token: GoogleToken | null = loadStoredToken();
   private pending: Promise<GoogleToken> | null = null;
 
   constructor(private readonly clientId: string) {}
@@ -129,6 +169,7 @@ export class GoogleAuth {
           accessToken: response.access_token,
           expiresAt: Date.now() + expiresIn * 1000,
         };
+        storeToken(this.token);
         resolve(this.token);
       };
 
@@ -137,9 +178,16 @@ export class GoogleAuth {
     });
   }
 
+  /** Drive 側で 401 が返ったときに呼ぶ。控えを捨てて取り直せるようにする */
+  invalidate() {
+    this.token = null;
+    storeToken(null);
+  }
+
   signOut() {
     const token = this.token?.accessToken;
     this.token = null;
+    storeToken(null);
     if (token) window.google?.accounts.oauth2.revoke(token);
   }
 }
