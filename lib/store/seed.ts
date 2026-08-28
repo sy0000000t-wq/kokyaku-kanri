@@ -4,11 +4,11 @@ import {
   seedEquipmentCategories,
   seedInspectionCycles,
 } from "@/db/seed-data";
+import type { AppDocument } from "./document";
 import {
   DOCUMENT_VERSION,
   NOT_SAVED,
   defaultSettings,
-  type AppDocument,
   type CategoryCycle,
   type CoefficientRow,
   type CoefficientTable,
@@ -148,7 +148,14 @@ export function parseDocument(raw: unknown): AppDocument {
     categoryCycles: list("categoryCycles"),
     inspectionCycles: list("inspectionCycles"),
     billingCycles: list("billingCycles"),
-    customers: list("customers"),
+    // 項目を後から増やしているので、古いデータには既定値を補う
+    customers: (list("customers") as AppDocument["customers"]).map((c) => ({
+      ...c,
+      annualAvailability: c.annualAvailability ?? "unspecified",
+      annualAvailabilityNote: c.annualAvailabilityNote ?? "",
+      priorContactRequired: c.priorContactRequired ?? 0,
+      priorContactNote: c.priorContactNote ?? "",
+    })),
     customerFacilities: list("customerFacilities"),
     customerInspectionMonths: list("customerInspectionMonths"),
     inspectionRecords: list("inspectionRecords"),

@@ -10,7 +10,9 @@ import { ScopeFilter } from "@/components/scope-filter";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
 import { getInspectionTarget, scheduleSymbol } from "@/lib/calc/schedule";
 import { useStore } from "@/lib/store/context";
-import { buildInspectionGrid } from "@/lib/store/monthly";
+import { buildInspectionGrid, type InspectionCell } from "@/lib/store/monthly";
+import { groupByCity } from "@/lib/store/route-groups";
+import { AVAILABILITY_LABEL } from "@/lib/customer-columns";
 import { getCustomerViews } from "@/lib/store/selectors";
 import { resolvePeriod } from "@/lib/period";
 import {
@@ -33,6 +35,8 @@ function SchedulePageInner() {
   const period = resolvePeriod(sp);
   const showAll = sp.active === "all";
   const typeFilter = sp.type === "regular" || sp.type === "annual" ? sp.type : "both";
+  // 既定は市町村ごと。日によって使い分けられるよう距離順にも切り替えられる
+  const listView = sp.view === "flat" ? "flat" : "group";
 
   const rows = getCustomerViews(doc, indexes).filter((c) => showAll || c.isActive);
   const { cellFor } = buildInspectionGrid(doc, period.year);
@@ -47,6 +51,8 @@ function SchedulePageInner() {
     })
     .filter((cell) => cell.isTarget)
     .sort((a, b) => (a.customer.distanceKm ?? 1e9) - (b.customer.distanceKm ?? 1e9));
+
+  const routeGroups = groupByCity(monthCells);
 
   const regularCount = monthCells.filter((c) => c.type === "regular").length;
   const annualCount = monthCells.filter((c) => c.type === "annual").length;
@@ -219,77 +225,153 @@ function SchedulePageInner() {
       <Card>
         <CardHeader
           title={`${formatYearMonth(period.year, period.month)}の点検リスト`}
-          description="距離の近い順。連絡先はタップで発信、住所はマップで開けます"
+          description="市町村ごとにまとめ、近いところから順に並べています。連絡先はタップで発信、住所はマップで開けます"
+          action={
+            <div className="no-print inline-flex rounded-md border border-line p-0.5">
+              {[
+                { value: "group", label: "市町村ごと" },
+                { value: "flat", label: "距離順" },
+              ].map((o) => {
+                const params = new URLSearchParams(
+                  Object.entries(sp).filter(([, v]) => v) as [string, string][],
+                );
+                if (o.value === "group") params.delete("view");
+                else params.set("view", o.value);
+                return (
+                  <Link
+                    key={o.value}
+                    href={`/schedule?${params.toString()}`}
+                    className={cn(
+                      "rounded px-2.5 py-1 text-xs",
+                      listView === o.value
+                        ? "bg-brand text-white"
+                        : "text-muted hover:text-ink",
+                    )}
+                  >
+                    {o.label}
+                  </Link>
+                );
+              })}
+            </div>
+          }
         />
         {monthCells.length === 0 ? (
           <EmptyState>この月の点検対象はありません。</EmptyState>
-        ) : (
+        ) : listView === "flat" ? (
           <ul className="divide-y divide-line">
             {monthCells.map((cell) => (
-              <li
+              <InspectionListItem
                 key={`${cell.customer.id}-${cell.type}`}
-                className="flex flex-wrap items-start gap-3 px-4 py-3"
-              >
-                <div className="flex-1 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Link
-                      href={`/customers/edit?id=${cell.customer.id}`}
-                      className="font-medium text-brand hover:underline"
-                    >
-                      {cell.customer.name}
-                    </Link>
-                    <Badge tone={cell.type === "annual" ? "warn" : "brand"}>
-                      {cell.type === "annual" ? "★ 年次点検" : "● 通常点検"}
-                    </Badge>
-                    <span className="tabular text-xs text-muted">
-                      {formatKm(cell.customer.distanceKm)}
-                      {cell.customer.distanceMethod === "straight" && "（直線）"}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted">
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(cell.customer.address)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="underline hover:text-ink"
-                    >
-                      {cell.customer.address}
-                    </a>
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 text-xs">
-                    {splitPhones(cell.customer.phone).map((p) => (
-                      <a key={p} href={telHref(p)} className="text-brand underline">
-                        {p}
-                      </a>
-                    ))}
-                    {cell.customer.contactPerson && (
-                      <span className="text-muted">{cell.customer.contactPerson}</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {cell.doneDate && (
-                    <span className="tabular text-xs text-muted">
-                      {formatDate(cell.doneDate)}
-                    </span>
-                  )}
-                  <InspectionCheck
-                    customerId={cell.customer.id}
-                    customerName={cell.customer.name}
-                    year={period.year}
-                    month={period.month}
-                    type={cell.type}
-                    isDone={cell.isDone}
-                    label="実施済み"
-                  />
-                </div>
-              </li>
+                cell={cell}
+                period={period}
+              />
             ))}
           </ul>
+        ) : (
+          <div className="divide-y divide-line">
+            {routeGroups.map((group) => (
+              <section key={group.city}>
+                <div className="flex items-baseline justify-between gap-3 bg-canvas px-4 py-2">
+                  <h3 className="text-sm font-medium">{group.city}</h3>
+                  <p className="tabular text-xs text-muted">
+                    {group.cells.length} 件
+                    {group.nearestKm != null && ` / 最短 ${formatKm(group.nearestKm)}`}
+                  </p>
+                </div>
+                <ul className="divide-y divide-line">
+                  {group.cells.map((cell) => (
+                    <InspectionListItem
+                      key={`${cell.customer.id}-${cell.type}`}
+                      cell={cell}
+                      period={period}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
         )}
       </Card>
     </div>
+  );
+}
+
+/** 当月リストの1件。グループ表示でも距離順表示でも同じ見た目にする */
+function InspectionListItem({
+  cell,
+  period,
+}: {
+  cell: InspectionCell;
+  period: { year: number; month: number };
+}) {
+  const c = cell.customer;
+  return (
+    <li className="flex flex-wrap items-start gap-3 px-4 py-3">
+      <div className="flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/customers/edit?id=${c.id}`}
+            className="font-medium text-brand hover:underline"
+          >
+            {c.name}
+          </Link>
+          <Badge tone={cell.type === "annual" ? "warn" : "brand"}>
+            {cell.type === "annual" ? "★ 年次点検" : "● 通常点検"}
+          </Badge>
+          <span className="tabular text-xs text-muted">
+            {formatKm(c.distanceKm)}
+            {c.distanceMethod === "straight" && "（直線）"}
+          </span>
+          {/* 現場に行く前に知りたいことは、ここに出しておく */}
+          {!!c.priorContactRequired && <Badge tone="warn">事前連絡が必要</Badge>}
+          {cell.type === "annual" && c.annualAvailability !== "unspecified" && (
+            <Badge>{AVAILABILITY_LABEL[c.annualAvailability]}</Badge>
+          )}
+        </div>
+
+        <div className="text-xs text-muted">
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-ink"
+          >
+            {c.address}
+          </a>
+        </div>
+
+        <div className="flex flex-wrap gap-x-3 text-xs">
+          {splitPhones(c.phone).map((p) => (
+            <a key={p} href={telHref(p)} className="text-brand underline">
+              {p}
+            </a>
+          ))}
+          {c.contactPerson && <span className="text-muted">{c.contactPerson}</span>}
+        </div>
+
+        {!!c.priorContactRequired && c.priorContactNote && (
+          <p className="text-xs text-warn">{c.priorContactNote}</p>
+        )}
+        {cell.type === "annual" && c.annualAvailabilityNote && (
+          <p className="text-xs text-muted">{c.annualAvailabilityNote}</p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        {cell.doneDate && (
+          <span className="tabular text-xs text-muted">{formatDate(cell.doneDate)}</span>
+        )}
+        <InspectionCheck
+          customerId={c.id}
+          customerName={c.name}
+          year={period.year}
+          month={period.month}
+          type={cell.type}
+          isDone={cell.isDone}
+          label="実施済み"
+        />
+      </div>
+    </li>
   );
 }
 

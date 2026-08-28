@@ -60,6 +60,9 @@ export function CustomerForm({
   const [contractStartDate, setContractStartDate] = useState(initial.contractStartDate);
   const [isActive, setIsActive] = useState(initial.isActive === 1);
   const [contractEndDate, setContractEndDate] = useState(initial.contractEndDate ?? "");
+  const [priorContactRequired, setPriorContactRequired] = useState(
+    initial.priorContactRequired === 1,
+  );
   const [months, setMonths] = useState<number[]>(initial.inspectionMonths);
   const [dirty, setDirty] = useState(false);
   // React 19 は action 実行後に未制御フィールドをリセットするため、
@@ -76,6 +79,9 @@ export function CustomerForm({
     contactPerson: initial.contactPerson,
     annualInspectionMonth: initial.annualInspectionMonth?.toString() ?? "",
     annualInspectionDay: initial.annualInspectionDay?.toString() ?? "",
+    annualAvailability: initial.annualAvailability,
+    annualAvailabilityNote: initial.annualAvailabilityNote,
+    priorContactNote: initial.priorContactNote,
     billingCycleId: initial.billingCycleId?.toString() ?? "",
     paymentLagMonths: String(initial.paymentLagMonths),
   });
@@ -168,6 +174,11 @@ export function CustomerForm({
       contractEndDate: contractEndDate || null,
       annualInspectionMonth: toNum(fields.annualInspectionMonth),
       annualInspectionDay: toNum(fields.annualInspectionDay),
+      annualAvailability:
+        fields.annualAvailability as CustomerInput["annualAvailability"],
+      annualAvailabilityNote: fields.annualAvailabilityNote,
+      priorContactRequired: priorContactRequired ? 1 : 0,
+      priorContactNote: fields.priorContactNote,
       billingCycleId: toNum(fields.billingCycleId),
       paymentLagMonths: toNum(fields.paymentLagMonths) ?? 1,
       isActive: isActive ? 1 : 0,
@@ -486,6 +497,37 @@ export function CustomerForm({
                     {...bind("annualInspectionDay")}
                   />
                 </div>
+              </Field>
+
+              <Field label="年次点検の実施可能日">
+                <Select {...bind("annualAvailability")}>
+                  <option value="unspecified">指定なし</option>
+                  <option value="weekday">平日のみ</option>
+                  <option value="holiday">休日のみ</option>
+                  <option value="any">いつでも可</option>
+                </Select>
+              </Field>
+              <Field label="実施可能日の補足" hint="「第2土曜のみ」「年末は不可」など">
+                <Input {...bind("annualAvailabilityNote")} />
+              </Field>
+
+              <Field label="月次点検の事前連絡">
+                <div className="flex h-9 items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={priorContactRequired}
+                      onChange={(e) => setPriorContactRequired(e.target.checked)}
+                    />
+                    事前連絡が必要
+                  </label>
+                </div>
+              </Field>
+              <Field label="事前連絡の補足" hint="「前日までに担当者へ電話」など">
+                <Input
+                  {...bind("priorContactNote")}
+                  disabled={!priorContactRequired}
+                />
               </Field>
 
               <Field

@@ -2,6 +2,7 @@ import { calcExpectedPayment } from "@/lib/calc/billing";
 import { todayIso } from "@/lib/utils";
 import {
   nextId,
+  type AnnualAvailability,
   type AppDocument,
   type BillingCycle,
   type CategoryCycle,
@@ -54,6 +55,10 @@ export type CustomerInput = {
   contractEndDate: string | null;
   annualInspectionMonth: number | null;
   annualInspectionDay: number | null;
+  annualAvailability: AnnualAvailability;
+  annualAvailabilityNote: string;
+  priorContactRequired: number;
+  priorContactNote: string;
   billingCycleId: number | null;
   paymentLagMonths: number;
   isActive: number;
@@ -101,6 +106,10 @@ export function saveCustomer(
     contractEndDate: input.contractEndDate,
     annualInspectionMonth: input.annualInspectionMonth,
     annualInspectionDay: input.annualInspectionDay,
+    annualAvailability: input.annualAvailability,
+    annualAvailabilityNote: input.annualAvailabilityNote,
+    priorContactRequired: input.priorContactRequired,
+    priorContactNote: input.priorContactNote,
     billingCycleId: input.billingCycleId,
     paymentLagMonths: input.paymentLagMonths,
     isActive: input.isActive,

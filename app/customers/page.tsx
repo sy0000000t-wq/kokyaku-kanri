@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -9,6 +9,14 @@ import { ActiveToggle } from "@/components/customers/active-toggle";
 import { RecalcDistancesButton } from "@/components/customers/recalc-distances-button";
 import { Badge, buttonClass, Card, EmptyState } from "@/components/ui";
 import { CustomerCsvButton } from "@/components/customers/customer-csv-button";
+import { CustomerCell } from "@/components/customers/customer-cell";
+import { ColumnPicker } from "@/components/customers/column-picker";
+import {
+  COLUMNS,
+  loadVisibleColumns,
+  saveVisibleColumns,
+  type ColumnId,
+} from "@/lib/customer-columns";
 import {
   applyCustomerFilters,
   parseCustomerFilters,
@@ -27,6 +35,15 @@ import {
 } from "@/lib/utils";
 
 type SP = Record<string, string | undefined>;
+
+/** 並べ替えに対応している列 */
+const SORTABLE: Partial<Record<ColumnId, SortKey>> = {
+  points: "points",
+  monthlyExcl: "monthly",
+  annualExcl: "annual",
+  unitPrice: "unitPrice",
+  distance: "distance",
+};
 
 function SortLink({
   label,
@@ -65,6 +82,14 @@ function CustomersPageInner() {
   const params = useSearchParams();
   const { doc, indexes } = useStore();
 
+  const [visible, setVisible] = useState<ColumnId[]>(loadVisibleColumns);
+  // 端末に憶えておく
+  useEffect(() => saveVisibleColumns(visible), [visible]);
+
+  const shownColumns = COLUMNS.filter((c) => visible.includes(c.id));
+  // 固定2列 + 選んだ列 + 状態列。横スクロールできる幅を確保する
+  const tableMinWidth = `${28 + shownColumns.length * 9}rem`;
+
   const sp: SP = Object.fromEntries(params.entries());
   const filters = parseCustomerFilters(sp);
   const all = getCustomerViews(doc, indexes);
@@ -82,6 +107,7 @@ function CustomersPageInner() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <ColumnPicker visible={visible} onChange={setVisible} />
           <RecalcDistancesButton />
           <CustomerCsvButton rows={rows} />
           <Link href="/customers/new" className={buttonClass("default", "sm")}>
@@ -105,7 +131,7 @@ function CustomersPageInner() {
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1560px] text-sm">
+            <table className="w-full text-sm" style={{ minWidth: tableMinWidth }}>
               <thead className="border-b border-line bg-canvas text-xs text-muted">
                 <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
                   <th className="sticky-col left-0 w-[4.5rem] min-w-[4.5rem] whitespace-nowrap">
@@ -114,26 +140,22 @@ function CustomersPageInner() {
                   <th className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 sm:w-52 sm:min-w-52">
                     <SortLink label="物件名称" sortKey="name" sp={sp} />
                   </th>
-                  <th className="w-72 min-w-72">設備</th>
-                  <th>訪問周期</th>
-                  <th className="text-right!">
-                    <SortLink label="保安管理点数" sortKey="points" sp={sp} />
-                  </th>
-                  <th className="text-right!">
-                    <SortLink label="月額(税抜)" sortKey="monthly" sp={sp} />
-                  </th>
-                  <th className="text-right!">
-                    <SortLink label="年額(税抜)" sortKey="annual" sp={sp} />
-                  </th>
-                  <th className="text-right!">
-                    <SortLink label="点数単価" sortKey="unitPrice" sp={sp} />
-                  </th>
-                  <th className="text-right!">
-                    <SortLink label="距離" sortKey="distance" sp={sp} />
-                  </th>
-                  <th>担当者</th>
-                  <th>連絡先</th>
-                  <th>契約開始日</th>
+                  {shownColumns.map((col) => (
+                    <th
+                      key={col.id}
+                      className={cn(
+                        "whitespace-nowrap",
+                        col.numeric && "text-right!",
+                        col.id === "facilities" && "min-w-64",
+                      )}
+                    >
+                      {SORTABLE[col.id] ? (
+                        <SortLink label={col.label} sortKey={SORTABLE[col.id]!} sp={sp} />
+                      ) : (
+                        col.label
+                      )}
+                    </th>
+                  ))}
                   <th className="text-center!">状態</th>
                 </tr>
               </thead>
@@ -143,7 +165,7 @@ function CustomersPageInner() {
                     key={c.id}
                     className={cn(
                       "border-b border-line last:border-0 hover:bg-canvas",
-                      // §6 解除済みの行は淡色表示
+                      // 解除済みの行は淡色表示
                       !c.isActive && "text-muted opacity-70",
                     )}
                   >
@@ -163,70 +185,18 @@ function CustomersPageInner() {
                         </Badge>
                       )}
                     </td>
-                    <td className="px-2.5 py-2 text-xs">
-                      {c.facilities.length === 0 ? (
-                        <Badge tone="warn">設備が未登録</Badge>
-                      ) : (
-                        c.facilities.map((f) => (
-                          <div key={f.id} className="whitespace-nowrap">
-                            {summarizeFacility(
-                              f.category?.name,
-                              f.capacity,
-                              f.category?.capacityUnit,
-                            )}
-                            <span className="ml-1 text-muted">
-                              / {f.cycle?.name ?? "—"} / {formatPoints(f.result.points)}点
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </td>
-                    <td className="px-2.5 py-2 whitespace-nowrap">
-                      {c.inspectionCycle?.name ?? "—"}
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-right">
-                      {formatPoints(c.points)}
-                      {c.facilities.some((f) => f.result.isOverridden) && (
-                        <Badge tone="warn" className="ml-1">
-                          手動
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-right">
-                      {formatYen(c.pricing.monthlyExcl)}
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-right">
-                      {formatYen(c.pricing.annualExcl)}
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-right">
-                      {formatYen(c.pricing.unitPrice)}
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-right whitespace-nowrap">
-                      {c.distanceKm == null ? (
-                        <Badge tone="warn">未取得</Badge>
-                      ) : (
-                        <>
-                          {formatKm(c.distanceKm)}
-                          {c.distanceMethod === "straight" && (
-                            <Badge tone="neutral" className="ml-1">
-                              直線
-                            </Badge>
-                          )}
-                        </>
-                      )}
-                    </td>
-                    <td className="px-2.5 py-2 whitespace-nowrap">
-                      {c.contactPerson || "—"}
-                    </td>
-                    <td className="px-2.5 py-2 text-xs whitespace-nowrap">
-                      {splitPhones(c.phone).map((p) => (
-                        <div key={p}>{p}</div>
-                      ))}
-                      {splitPhones(c.phone).length === 0 && "—"}
-                    </td>
-                    <td className="tabular px-2.5 py-2 whitespace-nowrap">
-                      {formatDate(c.contractStartDate)}
-                    </td>
+                    {shownColumns.map((col) => (
+                      <td
+                        key={col.id}
+                        className={cn(
+                          "px-2.5 py-2",
+                          col.numeric && "tabular text-right whitespace-nowrap",
+                          col.id === "facilities" && "text-xs",
+                        )}
+                      >
+                        <CustomerCell column={col.id} customer={c} />
+                      </td>
+                    ))}
                     <td className="px-2.5 py-2">
                       <div className="flex justify-center">
                         <ActiveToggle id={c.id} name={c.name} isActive={!!c.isActive} />
@@ -237,26 +207,18 @@ function CustomersPageInner() {
               </tbody>
               <tfoot className="border-t-2 border-line bg-canvas text-xs">
                 <tr className="[&>td]:px-2.5 [&>td]:py-2">
-                  <td colSpan={4} className="sticky-col left-0 font-medium">
+                  <td colSpan={2} className="sticky-col left-0 font-medium">
                     合計（稼働中 {summary.count} 件）
                   </td>
-                  <td className="tabular text-right font-medium">
-                    {formatPoints(summary.points)}
-                  </td>
-                  <td className="tabular text-right font-medium">
-                    {formatYen(summary.monthlyExcl)}
-                  </td>
-                  <td className="tabular text-right font-medium">
-                    {formatYen(summary.annualExcl)}
-                    <div className="font-normal text-muted">
-                      税込 {formatYen(summary.annualIncl)}
-                    </div>
-                  </td>
-                  <td className="tabular text-right font-medium">
-                    {formatYen(summary.unitPriceAvg)}
-                    <div className="font-normal text-muted">平均</div>
-                  </td>
-                  <td colSpan={5} />
+                  {shownColumns.map((col) => (
+                    <td
+                      key={col.id}
+                      className={cn(col.numeric && "tabular text-right font-medium")}
+                    >
+                      <ColumnTotal column={col.id} summary={summary} />
+                    </td>
+                  ))}
+                  <td />
                 </tr>
               </tfoot>
             </table>
@@ -277,4 +239,37 @@ export default function CustomersPage() {
       <CustomersPageInner />
     </Suspense>
   );
+}
+
+/** 集計フッターの各列。合計を出せる列だけ値を返す */
+function ColumnTotal({
+  column,
+  summary,
+}: {
+  column: ColumnId;
+  summary: ReturnType<typeof summarizeCustomers>;
+}) {
+  switch (column) {
+    case "points":
+      return <>{formatPoints(summary.points)}</>;
+    case "monthlyExcl":
+      return <>{formatYen(summary.monthlyExcl)}</>;
+    case "monthlyIncl":
+      return <>{formatYen(summary.monthlyIncl)}</>;
+    case "annualExcl":
+      return <>{formatYen(summary.annualExcl)}</>;
+    case "annualIncl":
+      return <>{formatYen(summary.annualIncl)}</>;
+    case "annualInspectionFee":
+      return <>{formatYen(summary.annualInspectionFeeExcl)}</>;
+    case "unitPrice":
+      return (
+        <>
+          {formatYen(summary.unitPriceAvg)}
+          <div className="font-normal text-muted">平均</div>
+        </>
+      );
+    default:
+      return null;
+  }
 }

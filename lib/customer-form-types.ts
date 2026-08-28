@@ -70,6 +70,10 @@ export type CustomerFormValues = {
   contractEndDate: string | null;
   annualInspectionMonth: number | null;
   annualInspectionDay: number | null;
+  annualAvailability: "unspecified" | "weekday" | "holiday" | "any";
+  annualAvailabilityNote: string;
+  priorContactRequired: number;
+  priorContactNote: string;
   billingCycleId: number | null;
   paymentLagMonths: number;
   isActive: number;
@@ -129,6 +133,10 @@ export function emptyCustomer(
     contractEndDate: null,
     annualInspectionMonth: null,
     annualInspectionDay: null,
+    annualAvailability: "unspecified",
+    annualAvailabilityNote: "",
+    priorContactRequired: 0,
+    priorContactNote: "",
     billingCycleId: masters.billingCycles[0]?.id ?? null,
     paymentLagMonths: 1,
     isActive: 1,

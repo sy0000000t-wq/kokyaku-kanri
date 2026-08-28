@@ -193,8 +193,14 @@ export function summarizeCustomers(views: CustomerView[]) {
     count: active.length,
     points: Math.round(points * 1000) / 1000,
     monthlyExcl: active.reduce((s, v) => s + v.pricing.monthlyExcl, 0),
+    monthlyIncl: active.reduce((s, v) => s + v.pricing.monthlyIncl, 0),
     annualExcl: active.reduce((s, v) => s + v.pricing.annualExcl, 0),
     annualIncl: active.reduce((s, v) => s + v.pricing.annualIncl, 0),
+    // 別途請求のものだけ足す（月額に含む物件は 0 として扱われる）
+    annualInspectionFeeExcl: active.reduce(
+      (s, v) => s + v.pricing.annualInspectionFeeExcl,
+      0,
+    ),
     unitPriceAvg:
       withUnitPrice.length > 0
         ? Math.round(

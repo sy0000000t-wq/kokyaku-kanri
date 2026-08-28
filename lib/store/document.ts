@@ -14,6 +14,8 @@ export type CalculationMethod = "table" | "fixed";
 export type CategoryGroup = "demand" | "generation" | "other";
 export type AnnualFeeHandling = "included" | "separate";
 export type DistanceMethod = "road" | "straight";
+/** 年次点検を実施できる曜日の区分 */
+export type AnnualAvailability = "unspecified" | "weekday" | "holiday" | "any";
 export type InspectionType = "regular" | "annual";
 
 export type Settings = {
@@ -108,6 +110,14 @@ export type Customer = {
   contractEndDate: string | null;
   annualInspectionMonth: number | null;
   annualInspectionDay: number | null;
+  /** 年次点検を実施できる曜日 */
+  annualAvailability: AnnualAvailability;
+  /** 実施可能日の補足（「第2土曜のみ」など） */
+  annualAvailabilityNote: string;
+  /** 月次点検の前に連絡が要るか */
+  priorContactRequired: number;
+  /** 事前連絡の補足（何日前・誰に・どの手段か） */
+  priorContactNote: string;
   billingCycleId: number | null;
   paymentLagMonths: number;
   isActive: number;
