@@ -141,6 +141,7 @@ export function parseDocument(raw: unknown): AppDocument {
   return {
     version: DOCUMENT_VERSION,
     savedAt: typeof d.savedAt === "string" ? d.savedAt : new Date().toISOString(),
+    // 設定も項目を増やしているので、既定値の上に読み込んだ値を重ねる
     settings: { ...base.settings, ...(rawSettings as object | undefined) },
     coefficientTables: list("coefficientTables"),
     coefficientRows: list("coefficientRows"),

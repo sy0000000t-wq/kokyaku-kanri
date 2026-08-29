@@ -32,19 +32,29 @@ export type BillingAmountInput = {
   annualInspectionFeeIncl: number;
   annualInspectionMonth: number | null;
   targetMonth: number;
+  /**
+   * 請求サイクルの間隔（月）。隔月なら 2、3ヶ月なら 3。
+   * 毎月でない場合、その回で間隔ぶんをまとめて請求する。
+   */
+  billingIntervalMonths?: number;
 };
 
 /**
- * §4.5 請求額の既定値。
- * 月額税込 ＋（別途請求 かつ 年次点検月と同月なら）年次点検費の税込額
+ * 請求額の既定値。
+ *
+ * 月額 × 請求サイクルの月数 ＋（別途請求 かつ 年次点検月と同月なら）年次点検費。
+ * 隔月請求なら1回の請求で2ヶ月分をまとめて請求するため、月額をそのまま出すと不足する。
  */
 export function calcDefaultBillingAmount(input: BillingAmountInput): number {
+  const months = Math.max(1, Math.round(input.billingIntervalMonths ?? 1));
+
   const annual =
     input.annualFeeHandling === "separate" &&
     input.annualInspectionMonth === input.targetMonth
       ? input.annualInspectionFeeIncl
       : 0;
-  return roundYen(input.monthlyIncl + annual);
+
+  return roundYen(input.monthlyIncl * months + annual);
 }
 
 /** §4.5 入金予定年月 ＝ 請求年月 ＋ payment_lag_months */

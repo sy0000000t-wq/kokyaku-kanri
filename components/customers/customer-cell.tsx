@@ -18,9 +18,12 @@ import {
 export function CustomerCell({
   column,
   customer,
+  showTaxIncluded,
 }: {
   column: ColumnId;
   customer: CustomerView;
+  /** 金額を税込で出すか */
+  showTaxIncluded: boolean;
 }) {
   const c = customer;
 
@@ -60,23 +63,30 @@ export function CustomerCell({
         </>
       );
 
-    case "monthlyExcl":
-      return <>{formatYen(c.pricing.monthlyExcl)}</>;
-    case "monthlyIncl":
-      return <>{formatYen(c.pricing.monthlyIncl)}</>;
-    case "annualExcl":
-      return <>{formatYen(c.pricing.annualExcl)}</>;
-    case "annualIncl":
-      return <>{formatYen(c.pricing.annualIncl)}</>;
+    case "monthly":
+      return (
+        <>
+          {formatYen(
+            showTaxIncluded ? c.pricing.monthlyIncl : c.pricing.monthlyExcl,
+          )}
+        </>
+      );
+    case "annual":
+      return (
+        <>
+          {formatYen(showTaxIncluded ? c.pricing.annualIncl : c.pricing.annualExcl)}
+        </>
+      );
 
     case "annualInspectionFee":
       // 月額に含む場合は金額が存在しないので、そうと分かるように出す
       return c.annualFeeHandling === "separate" ? (
         <>
-          {formatYen(c.pricing.annualInspectionFeeExcl)}
-          <div className="text-xs text-muted">
-            税込 {formatYen(c.pricing.annualInspectionFeeIncl)}
-          </div>
+          {formatYen(
+            showTaxIncluded
+              ? c.pricing.annualInspectionFeeIncl
+              : c.pricing.annualInspectionFeeExcl,
+          )}
         </>
       ) : (
         <span className="text-xs text-muted">月額に含む</span>

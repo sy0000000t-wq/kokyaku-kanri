@@ -223,3 +223,29 @@ describe("parseDocument", () => {
     expect(() => parseDocument({ customers: "not an array" })).toThrow();
   });
 });
+
+describe("設備ごとの点検月", () => {
+  it("自家消費の太陽光は6ヶ月に1回の月だけ対象になる", () => {
+    const doc = createInitialDocument();
+    // 3月契約開始。需要設備は2ヶ月ごと、太陽光は6ヶ月ごと
+    doc.customers.push(customer({ contractStartDate: "2026-03-01" }));
+    addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 300);
+    addFacility(doc, 1, CATEGORY.solarSelf, "6ヶ月に1回", 80);
+
+    const view = getCustomerViews(doc, buildIndexes(doc))[0];
+    const demand = view.facilities[0];
+    const solar = view.facilities[1];
+
+    expect(demand.inspectionMonths).toEqual([1, 3, 5, 7, 9, 11]);
+    expect(solar.inspectionMonths).toEqual([3, 9]);
+  });
+
+  it("毎月点検の設備は全月が対象", () => {
+    const doc = createInitialDocument();
+    doc.customers.push(customer({ contractStartDate: "2026-03-01" }));
+    addFacility(doc, 1, CATEGORY.demandOver100, "月1回", 300);
+
+    const view = getCustomerViews(doc, buildIndexes(doc))[0];
+    expect(view.facilities[0].inspectionMonths).toHaveLength(12);
+  });
+});

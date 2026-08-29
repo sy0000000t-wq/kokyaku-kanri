@@ -1,5 +1,6 @@
 import type { Settings } from "@/lib/store/document";
 import { GoogleProvider } from "./google";
+import { GsiProvider } from "./gsi";
 import { HaversineProvider } from "./haversine";
 import type { GeoProvider } from "./provider";
 
@@ -28,15 +29,22 @@ export function resolveApiKey(settings: Pick<Settings, "googleMapsApiKey">) {
  * auto: API キーがあれば道路距離、無ければ直線距離。
  */
 export function resolveProvider(
-  settings: Pick<Settings, "googleMapsApiKey" | "distanceMode">,
+  settings: Pick<Settings, "googleMapsApiKey" | "distanceMode"> &
+    Partial<Pick<Settings, "detourFactor">>,
 ): GeoProvider {
   const apiKey = resolveApiKey(settings);
-  const userAgent = envUserAgent() || DEFAULT_USER_AGENT;
+  const detour = settings.detourFactor ?? 1;
 
-  if (settings.distanceMode === "straight") return new HaversineProvider(userAgent);
+  // 日本の住所は国土地理院がいちばん正確に引ける。鍵も登録も要らない
+  if (settings.distanceMode === "straight") return new GsiProvider(detour);
   if (settings.distanceMode === "road") {
     if (!apiKey) throw new Error("道路距離モードには Google Maps API キーが必要です");
     return new GoogleProvider(apiKey);
   }
-  return apiKey ? new GoogleProvider(apiKey) : new HaversineProvider(userAgent);
+  return apiKey ? new GoogleProvider(apiKey) : new GsiProvider(detour);
+}
+
+/** 住所が引けないときの予備。海外の住所などはこちらで拾える */
+export function fallbackProvider(): GeoProvider {
+  return new HaversineProvider(envUserAgent() || DEFAULT_USER_AGENT);
 }

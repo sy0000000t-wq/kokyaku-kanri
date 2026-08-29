@@ -83,6 +83,12 @@ export type FacilityView = CustomerFacility & {
   category: EquipmentCategory | null;
   cycle: CategoryCycle | null;
   result: FacilityPointsResult;
+  /**
+   * この設備の点検を行う月。設備区分の周期から契約開始月起点で導出する。
+   * 訪問周期より長い設備（自家消費の太陽光＝6ヶ月に1回など）を、
+   * どの訪問で実施するか示すために使う。
+   */
+  inspectionMonths: number[];
 };
 
 export type CustomerView = Customer & {
@@ -130,15 +136,26 @@ export function buildCustomerView(
 
   const site = calcSitePoints(inputs);
 
-  const facilityViews: FacilityView[] = facilities.map((f, i) => ({
-    ...f,
-    category: doc.equipmentCategories.find((c) => c.id === f.categoryId) ?? null,
-    cycle:
+  const startMonthForFacilities =
+    parseYearMonth(customer.contractStartDate)?.month ?? 1;
+
+  const facilityViews: FacilityView[] = facilities.map((f, i) => {
+    const cycle =
       indexes.categoryCyclesByCategory
         .get(f.categoryId)
-        ?.find((c) => c.id === f.categoryCycleId) ?? null,
-    result: site.facilities[i],
-  }));
+        ?.find((c) => c.id === f.categoryCycleId) ?? null;
+
+    return {
+      ...f,
+      category: doc.equipmentCategories.find((c) => c.id === f.categoryId) ?? null,
+      cycle,
+      result: site.facilities[i],
+      inspectionMonths: generateCycleMonths(
+        startMonthForFacilities,
+        cycle?.intervalMonths ?? 1,
+      ),
+    };
+  });
 
   const pricing = calcPricing({
     monthlyFee: customer.monthlyFee,

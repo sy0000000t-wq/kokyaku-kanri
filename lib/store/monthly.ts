@@ -23,6 +23,11 @@ export type InspectionCell = {
   isDone: boolean;
   doneDate: string | null;
   record: InspectionRecord | null;
+  /**
+   * この訪問で点検する設備。
+   * 訪問周期より長い周期の設備は、該当する月の訪問だけに現れる。
+   */
+  dueFacilities: CustomerView["facilities"];
 };
 
 export type BillingCell = {
@@ -68,6 +73,12 @@ export function buildInspectionGrid(doc: AppDocument, year: number) {
     );
     const record = records.get(inspectionKey(customer.id, month, type)) ?? null;
 
+    // 年次点検の回では設備別の周期を持ち出さない（別枠の点検のため）
+    const dueFacilities =
+      type === "regular"
+        ? customer.facilities.filter((f) => f.inspectionMonths.includes(month))
+        : [];
+
     return {
       customer,
       type,
@@ -75,6 +86,7 @@ export function buildInspectionGrid(doc: AppDocument, year: number) {
       isDone: !!record?.isDone,
       doneDate: record?.doneDate ?? null,
       record,
+      dueFacilities,
     };
   };
 
@@ -109,6 +121,8 @@ export function buildBillingGrid(
       annualInspectionFeeIncl: customer.pricing.annualInspectionFeeIncl,
       annualInspectionMonth: customer.annualInspectionMonth,
       targetMonth: month,
+      // 隔月・3ヶ月請求などは、その回でまとめて請求する
+      billingIntervalMonths: customer.billingCycle?.intervalMonths ?? 1,
     });
 
     const record = records.get(billingKey(customer.id, month)) ?? null;

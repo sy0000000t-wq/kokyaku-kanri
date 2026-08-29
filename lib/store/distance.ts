@@ -1,4 +1,4 @@
-import { resolveProvider } from "@/lib/geo";
+import { fallbackProvider, resolveProvider } from "@/lib/geo";
 import type { AppDocument, Customer } from "./document";
 import { updateDistance } from "./mutations";
 
@@ -13,6 +13,8 @@ export type DistanceOutcome =
 export async function recalcDistance(
   doc: AppDocument,
   customer: Customer,
+  /** 保存済みの座標を捨てて、住所から引き直す */
+  regeocode = false,
 ): Promise<DistanceOutcome> {
   const { settings } = doc;
   if (!settings.baseAddress || settings.baseLat == null || settings.baseLng == null) {
@@ -26,10 +28,18 @@ export async function recalcDistance(
     return { ok: false, message: (e as Error).message };
   }
 
-  let lat = customer.lat;
-  let lng = customer.lng;
+  let lat = regeocode ? null : customer.lat;
+  let lng = regeocode ? null : customer.lng;
   if (lat == null || lng == null) {
-    const geo = await provider.geocode(customer.address);
+    // まず国土地理院。引けなければ OpenStreetMap で拾い直す
+    let geo = await provider.geocode(customer.address);
+    if (!geo) {
+      try {
+        geo = await fallbackProvider().geocode(customer.address);
+      } catch {
+        geo = null;
+      }
+    }
     if (!geo) {
       return {
         ok: false,

@@ -329,6 +329,22 @@ function InspectionListItem({
           )}
         </div>
 
+        {/* 訪問周期より長い周期の設備は、該当月だけここに出る */}
+        {cell.dueFacilities.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-xs text-muted">この訪問で点検：</span>
+            {cell.dueFacilities.map((f) => (
+              <Badge
+                key={f.id}
+                tone={f.cycle && f.cycle.intervalMonths > 1 ? "ok" : "neutral"}
+              >
+                {f.category?.name ?? "設備"}
+                {f.cycle && f.cycle.intervalMonths > 1 && `（${f.cycle.name}）`}
+              </Badge>
+            ))}
+          </div>
+        )}
+
         <div className="text-xs text-muted">
           <a
             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(c.address)}`}

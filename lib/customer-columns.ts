@@ -5,10 +5,8 @@ export type ColumnId =
   | "facilities"
   | "inspectionCycle"
   | "points"
-  | "monthlyExcl"
-  | "monthlyIncl"
-  | "annualExcl"
-  | "annualIncl"
+  | "monthly"
+  | "annual"
   | "annualInspectionFee"
   | "unitPrice"
   | "distance"
@@ -33,10 +31,8 @@ export const COLUMNS: ColumnDef[] = [
   { id: "inspectionCycle", label: "訪問周期", group: "設備" },
   { id: "points", label: "保安管理点数", numeric: true, group: "設備" },
 
-  { id: "monthlyExcl", label: "月額(税抜)", numeric: true, group: "料金" },
-  { id: "monthlyIncl", label: "月額(税込)", numeric: true, group: "料金" },
-  { id: "annualExcl", label: "年額(税抜)", numeric: true, group: "料金" },
-  { id: "annualIncl", label: "年額(税込)", numeric: true, group: "料金" },
+  { id: "monthly", label: "月額", numeric: true, group: "料金" },
+  { id: "annual", label: "年額", numeric: true, group: "料金" },
   {
     id: "annualInspectionFee",
     label: "年次点検費(別途)",
@@ -61,10 +57,8 @@ export const DEFAULT_VISIBLE: ColumnId[] = [
   "facilities",
   "inspectionCycle",
   "points",
-  "monthlyExcl",
-  "monthlyIncl",
-  "annualExcl",
-  "annualIncl",
+  "monthly",
+  "annual",
   "annualInspectionFee",
   "unitPrice",
   "distance",

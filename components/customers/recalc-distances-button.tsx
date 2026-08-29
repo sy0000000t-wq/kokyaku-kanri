@@ -13,7 +13,7 @@ export function RecalcDistancesButton() {
   const [progress, setProgress] = useState<string | null>(null);
   const [failures, setFailures] = useState<string[]>([]);
 
-  const run = async () => {
+  const run = async (regeocode: boolean) => {
     setRunning(true);
     setFailures([]);
 
@@ -25,7 +25,7 @@ export function RecalcDistancesButton() {
     for (const [i, customer] of targets.entries()) {
       setProgress(`${i + 1} / ${targets.length} 件目：${customer.name}`);
       try {
-        const r = await recalcDistance(working, customer);
+        const r = await recalcDistance(working, customer, regeocode);
         if (r.ok) {
           working = r.doc;
           success++;
@@ -45,9 +45,25 @@ export function RecalcDistancesButton() {
 
   return (
     <div className="flex flex-col items-end gap-1">
-      <Button variant="outline" size="sm" onClick={() => void run()} disabled={running}>
-        {running ? "計算中…（1秒に1件）" : "距離を一括再計算"}
-      </Button>
+      <div className="flex items-center gap-1.5">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void run(false)}
+          disabled={running}
+        >
+          {running ? "計算中…" : "距離を一括再計算"}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void run(true)}
+          disabled={running}
+          title="保存済みの座標を捨てて、住所から引き直します"
+        >
+          座標から取り直す
+        </Button>
+      </div>
       {progress && <p className="text-xs text-muted">{progress}</p>}
       {failures.length > 0 && (
         <ul className="max-w-md text-right text-xs text-warn">

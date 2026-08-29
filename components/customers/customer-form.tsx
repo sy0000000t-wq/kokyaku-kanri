@@ -220,7 +220,8 @@ export function CustomerForm({
     startRecalc(async () => {
       const customer = doc.customers.find((c) => c.id === initial.id);
       if (!customer) return;
-      const r = await recalcDistance(doc, customer);
+      // 画面から押すときは住所から引き直す
+      const r = await recalcDistance(doc, customer, true);
       if (r.ok) {
         update(() => r.doc);
         setDistance({ km: r.distanceKm, min: null, method: r.method });

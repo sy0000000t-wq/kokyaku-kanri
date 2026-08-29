@@ -11,6 +11,7 @@ import { Badge, buttonClass, Card, EmptyState } from "@/components/ui";
 import { CustomerCsvButton } from "@/components/customers/customer-csv-button";
 import { CustomerCell } from "@/components/customers/customer-cell";
 import { ColumnPicker } from "@/components/customers/column-picker";
+import { TaxToggle } from "@/components/tax-toggle";
 import {
   COLUMNS,
   loadVisibleColumns,
@@ -39,8 +40,8 @@ type SP = Record<string, string | undefined>;
 /** 並べ替えに対応している列 */
 const SORTABLE: Partial<Record<ColumnId, SortKey>> = {
   points: "points",
-  monthlyExcl: "monthly",
-  annualExcl: "annual",
+  monthly: "monthly",
+  annual: "annual",
   unitPrice: "unitPrice",
   distance: "distance",
 };
@@ -90,6 +91,8 @@ function CustomersPageInner() {
   // 固定2列 + 選んだ列 + 状態列。横スクロールできる幅を確保する
   const tableMinWidth = `${28 + shownColumns.length * 9}rem`;
 
+  const showTaxIncluded = doc.settings.showTaxIncluded;
+
   const sp: SP = Object.fromEntries(params.entries());
   const filters = parseCustomerFilters(sp);
   const all = getCustomerViews(doc, indexes);
@@ -107,6 +110,7 @@ function CustomersPageInner() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <TaxToggle />
           <ColumnPicker visible={visible} onChange={setVisible} />
           <RecalcDistancesButton />
           <CustomerCsvButton rows={rows} />
@@ -194,7 +198,11 @@ function CustomersPageInner() {
                           col.id === "facilities" && "text-xs",
                         )}
                       >
-                        <CustomerCell column={col.id} customer={c} />
+                        <CustomerCell
+                          column={col.id}
+                          customer={c}
+                          showTaxIncluded={showTaxIncluded}
+                        />
                       </td>
                     ))}
                     <td className="px-2.5 py-2">
@@ -215,7 +223,11 @@ function CustomersPageInner() {
                       key={col.id}
                       className={cn(col.numeric && "tabular text-right font-medium")}
                     >
-                      <ColumnTotal column={col.id} summary={summary} />
+                      <ColumnTotal
+                        column={col.id}
+                        summary={summary}
+                        showTaxIncluded={showTaxIncluded}
+                      />
                     </td>
                   ))}
                   <td />
@@ -245,21 +257,23 @@ export default function CustomersPage() {
 function ColumnTotal({
   column,
   summary,
+  showTaxIncluded,
 }: {
   column: ColumnId;
   summary: ReturnType<typeof summarizeCustomers>;
+  showTaxIncluded: boolean;
 }) {
   switch (column) {
     case "points":
       return <>{formatPoints(summary.points)}</>;
-    case "monthlyExcl":
-      return <>{formatYen(summary.monthlyExcl)}</>;
-    case "monthlyIncl":
-      return <>{formatYen(summary.monthlyIncl)}</>;
-    case "annualExcl":
-      return <>{formatYen(summary.annualExcl)}</>;
-    case "annualIncl":
-      return <>{formatYen(summary.annualIncl)}</>;
+    case "monthly":
+      return (
+        <>{formatYen(showTaxIncluded ? summary.monthlyIncl : summary.monthlyExcl)}</>
+      );
+    case "annual":
+      return (
+        <>{formatYen(showTaxIncluded ? summary.annualIncl : summary.annualExcl)}</>
+      );
     case "annualInspectionFee":
       return <>{formatYen(summary.annualInspectionFeeExcl)}</>;
     case "unitPrice":

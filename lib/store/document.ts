@@ -25,6 +25,13 @@ export type Settings = {
   googleMapsApiKey: string | null;
   taxRate: number;
   distanceMode: DistanceMode;
+  /**
+   * 直線距離に掛ける補正。実際の走行距離に近づけるための目安。
+   * 1 なら補正なし。市街地はおおむね 1.3 前後。
+   */
+  detourFactor: number;
+  /** 金額を税込で表示するか */
+  showTaxIncluded: boolean;
   updatedAt: string;
 };
 
@@ -205,5 +212,7 @@ export const defaultSettings = (): Settings => ({
   googleMapsApiKey: null,
   taxRate: 0.1,
   distanceMode: "auto",
+  detourFactor: 1.3,
+  showTaxIncluded: false,
   updatedAt: NOT_SAVED,
 });

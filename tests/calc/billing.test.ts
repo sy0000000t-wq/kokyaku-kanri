@@ -25,6 +25,72 @@ describe("isBillingTarget §4.5", () => {
   });
 });
 
+describe("calcDefaultBillingAmount：請求サイクルぶんをまとめて請求する", () => {
+  it("隔月請求は2ヶ月分をまとめる", () => {
+    expect(
+      calcDefaultBillingAmount({
+        monthlyIncl: 19250,
+        annualFeeHandling: "included",
+        annualInspectionFeeIncl: 0,
+        annualInspectionMonth: null,
+        targetMonth: 5,
+        billingIntervalMonths: 2,
+      }),
+    ).toBe(38500);
+  });
+
+  it("3ヶ月請求は3ヶ月分", () => {
+    expect(
+      calcDefaultBillingAmount({
+        monthlyIncl: 19250,
+        annualFeeHandling: "included",
+        annualInspectionFeeIncl: 0,
+        annualInspectionMonth: null,
+        targetMonth: 6,
+        billingIntervalMonths: 3,
+      }),
+    ).toBe(57750);
+  });
+
+  it("年1回請求は12ヶ月分", () => {
+    expect(
+      calcDefaultBillingAmount({
+        monthlyIncl: 19250,
+        annualFeeHandling: "included",
+        annualInspectionFeeIncl: 0,
+        annualInspectionMonth: null,
+        targetMonth: 4,
+        billingIntervalMonths: 12,
+      }),
+    ).toBe(231000);
+  });
+
+  it("まとめ請求でも年次点検費は1回分だけ足す", () => {
+    expect(
+      calcDefaultBillingAmount({
+        monthlyIncl: 15400,
+        annualFeeHandling: "separate",
+        annualInspectionFeeIncl: 44000,
+        annualInspectionMonth: 4,
+        targetMonth: 4,
+        billingIntervalMonths: 2,
+      }),
+    ).toBe(74800); // 15,400 × 2 + 44,000
+  });
+
+  it("指定が無ければ従来どおり1ヶ月分", () => {
+    expect(
+      calcDefaultBillingAmount({
+        monthlyIncl: 19250,
+        annualFeeHandling: "included",
+        annualInspectionFeeIncl: 0,
+        annualInspectionMonth: null,
+        targetMonth: 5,
+      }),
+    ).toBe(19250);
+  });
+});
+
 describe("calcDefaultBillingAmount §4.5", () => {
   it("通常月は月額税込のみ", () => {
     expect(

@@ -16,6 +16,9 @@ export function BasicSettings({ settings }: { settings: Settings }) {
   const [taxRate, setTaxRate] = useState(settings.taxRate.toString());
   const [distanceMode, setDistanceMode] = useState<DistanceMode>(settings.distanceMode);
   const [apiKey, setApiKey] = useState(settings.googleMapsApiKey ?? "");
+  const [detourFactor, setDetourFactor] = useState(
+    String(settings.detourFactor ?? 1.3),
+  );
 
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +36,7 @@ export function BasicSettings({ settings }: { settings: Settings }) {
         const provider = resolveProvider({
           googleMapsApiKey: apiKey || null,
           distanceMode,
+          detourFactor: Number(detourFactor) || 1,
         });
         const geo = await provider.geocode(address);
         if (!geo) {
@@ -69,6 +73,7 @@ export function BasicSettings({ settings }: { settings: Settings }) {
         googleMapsApiKey: apiKey || null,
         taxRate: rate,
         distanceMode,
+        detourFactor: Math.max(1, Number(detourFactor) || 1),
       }),
     );
     setMessage("設定を保存しました");
@@ -146,6 +151,20 @@ export function BasicSettings({ settings }: { settings: Settings }) {
           </Field>
 
           <Field
+            label="道路距離の補正"
+            hint="直線距離に掛ける倍率。市街地はおおむね1.3前後。1にすると補正なし"
+          >
+            <Input
+              type="number"
+              step="0.05"
+              min="1"
+              max="3"
+              value={detourFactor}
+              onChange={(e) => setDetourFactor(e.target.value)}
+            />
+          </Field>
+
+          <Field
             label="Google Maps API キー"
             className="sm:col-span-2"
             hint="ブラウザから直接呼ぶため、キーは端末から見える状態になります。Google 側でリファラ制限をかけてください"
@@ -175,11 +194,11 @@ export function BasicSettings({ settings }: { settings: Settings }) {
             現在の距離算出：
             {usingRoad
               ? distanceMode === "straight"
-                ? "直線距離（設定で固定）"
+                ? "国土地理院＋直線距離（設定で固定）"
                 : "道路距離（Google API）"
               : distanceMode === "road"
                 ? "道路距離を選択中ですが API キーがありません"
-                : "直線距離（OpenStreetMap Nominatim）"}
+                : `国土地理院で住所を引き、直線距離を ${detourFactor} 倍`}
             {doc.settings.baseLat == null && " / 基準住所の座標が未取得です"}
           </p>
         </div>
