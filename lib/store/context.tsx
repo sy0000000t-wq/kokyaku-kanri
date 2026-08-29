@@ -90,6 +90,12 @@ export function StoreProvider({
   const pendingRef = useRef<AppDocument | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushRef = useRef<(() => Promise<void>) | null>(null);
+  /**
+   * 最初の読み込みが終わるまで保存しない。
+   * 読み込み前は「まっさらな初期データ」を持っているので、
+   * ここで保存すると保存先を空で上書きしてしまう。
+   */
+  const readyRef = useRef(false);
 
   // 初回読み込み。前回ドライブを使っていたら、画面を出さずに繋ぎ直す
   useEffect(() => {
@@ -114,6 +120,8 @@ export function StoreProvider({
         if (loaded) {
           setDoc(loaded.doc);
           revisionRef.current = loaded.revision;
+
+          readyRef.current = true;
 
           if (loaded.conflictWithLocal) {
             setStatus("conflict");
@@ -144,11 +152,16 @@ export function StoreProvider({
             void flushRef.current?.();
           }
         }
+        readyRef.current = true;
         setStatus("ready");
       } catch (e) {
         if (cancelled) return;
+        // 読み込めなかったときは保存も許さない。中身が分からないまま上書きしないため
         setStatus("error");
-        setMessage(`データを読み込めませんでした: ${(e as Error).message}`);
+        setMessage(
+          `データを読み込めませんでした: ${(e as Error).message}。` +
+            "この状態では保存しません。再読み込みしてください。",
+        );
       }
     })();
     return () => {
@@ -183,7 +196,8 @@ export function StoreProvider({
     } else if (result.status === "conflict") {
       setStatus("conflict");
       setMessage(
-        "ほかの端末で更新されています。読み込み直すまで、この端末の変更は保存されません。",
+        "保存先の内容が変わっているため、上書きせずに止めました。" +
+          "読み込み直すと最新の内容になります（この端末の変更は反映されません）。",
       );
     } else {
       setStatus("error");
@@ -207,6 +221,11 @@ export function StoreProvider({
 
   const scheduleSave = useCallback(
     (next: AppDocument) => {
+      if (!readyRef.current) {
+        // 読み込みが終わる前の変更は捨てる。空データでの上書きを防ぐため
+        console.warn("読み込みが終わるまで保存しません");
+        return;
+      }
       pendingRef.current = next;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => void flush(), SAVE_DEBOUNCE_MS);
@@ -248,6 +267,7 @@ export function StoreProvider({
         revisionRef.current = loaded.revision;
       }
       pendingRef.current = null;
+      readyRef.current = true;
       setStatus("ready");
       setMessage(null);
     } catch (e) {
@@ -298,6 +318,7 @@ export function StoreProvider({
       authRef.current = auth;
       backendRef.current = drive;
       window.localStorage.setItem(DRIVE_FLAG, "1");
+      readyRef.current = true;
       setDriveConnected(true);
       setStatus("ready");
     } catch (e) {

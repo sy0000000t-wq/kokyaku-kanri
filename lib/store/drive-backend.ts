@@ -123,6 +123,25 @@ export class DriveBackend implements DocumentBackend {
     }
   }
 
+  /**
+   * 保存先のファイルに顧客が入っているかを直接見る。
+   * 端末内の控えではなく、必ず向こうの実物を確かめる。
+   */
+  private async remoteHasCustomers(): Promise<boolean> {
+    if (!this.fileId) return false;
+    try {
+      const res = await this.fetchWithAuth(
+        `${DRIVE_API}/files/${this.fileId}?alt=media`,
+      );
+      if (!res.ok) return false;
+      const body = (await res.json()) as { customers?: unknown[] };
+      return Array.isArray(body.customers) && body.customers.length > 0;
+    } catch {
+      // 確かめられないなら、危ないほうに倒して「中身がある」とみなす
+      return true;
+    }
+  }
+
   /** いま保存先にある版を調べる */
   private async currentRevision(fileId: string): Promise<string | null> {
     const res = await this.fetchWithAuth(
@@ -152,12 +171,23 @@ export class DriveBackend implements DocumentBackend {
         return { status: "saved", revision: created.version ?? null };
       }
 
-      // ほかの端末が先に書いていないか確かめる
-      if (expectedRevision !== null) {
+      // 版が分からないまま上書きしない。
+      // 読み込み前の空データで既存ファイルを潰す事故を防ぐための歯止め。
+      if (expectedRevision === null) {
         const current = await this.currentRevision(this.fileId);
-        if (current !== null && current !== expectedRevision) {
-          return { status: "conflict", revision: current };
-        }
+        return { status: "conflict", revision: current };
+      }
+
+      // ほかの端末が先に書いていないか確かめる
+      const current = await this.currentRevision(this.fileId);
+      if (current !== null && current !== expectedRevision) {
+        return { status: "conflict", revision: current };
+      }
+
+      // 中身が空なのに、保存先には中身がある場合は書かない。
+      // 何かの拍子に初期状態で上書きするのが最悪の事故なので、明示的に止める。
+      if (doc.customers.length === 0 && (await this.remoteHasCustomers())) {
+        return { status: "conflict", revision: current };
       }
 
       const res = await this.fetchWithAuth(
