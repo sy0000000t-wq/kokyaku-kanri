@@ -7,8 +7,9 @@ import { useSearchParams } from "next/navigation";
 import {
   BilledCheck,
   BillingAmount,
-  BillingCell,
+  BillingBox,
   PaidCheck,
+  PaymentBox,
 } from "@/components/billing/billing-cell";
 import { PeriodNav } from "@/components/period-nav";
 import { ScopeFilter } from "@/components/scope-filter";
@@ -39,36 +40,26 @@ function BillingPageInner() {
   const quick = sp.q === "unbilled" || sp.q === "unpaid" ? sp.q : "all";
 
   const rows = getCustomerViews(doc, indexes).filter((c) => showAll || c.isActive);
-  const { cellFor } = buildBillingGrid(doc, period.year, today);
+  const { cellFor, paymentCellFor } = buildBillingGrid(doc, period.year, today);
 
+  // この月に「立つ」請求
   const monthCells = rows
     .map((c) => cellFor(c, period.month))
     .filter((cell) => cell.isTarget);
 
-  const listCells = monthCells.filter((cell) => {
-    if (quick === "unbilled") return !cell.isBilled;
-    if (quick === "unpaid") return !cell.isPaid;
-    return true;
-  });
+  // この月に「入る」入金（請求は paymentLagMonths ヶ月前に立っている）
+  const paymentCells = rows
+    .map((c) => paymentCellFor(c, period.month))
+    .filter((cell) => cell !== null);
+
+  const billingList = monthCells.filter((cell) => quick !== "unbilled" || !cell.isBilled);
+  const paymentList = paymentCells.filter((cell) => quick !== "unpaid" || !cell.isPaid);
 
   // 集計パネル（§5.6）
   const billingTotal = monthCells.reduce((s, c) => s + c.amount, 0);
   const billedCells = monthCells.filter((c) => c.isBilled);
   const billedTotal = billedCells.reduce((s, c) => s + c.amount, 0);
 
-  // 今月に入金予定のセルは、年をまたぐ場合があるので前年分も見る
-  const paymentCells = [period.year - 1, period.year]
-    .flatMap((y) => {
-      const grid = buildBillingGrid(doc, y, today);
-      return rows.flatMap((c) =>
-        MONTHS.map((m) => grid.cellFor(c, m)).filter(
-          (cell) =>
-            cell.isTarget &&
-            cell.expected.year === period.year &&
-            cell.expected.month === period.month,
-        ),
-      );
-    });
   const paymentTotal = paymentCells.reduce((s, c) => s + c.amount, 0);
   const paidCells = paymentCells.filter((c) => c.isPaid);
   const paidTotal = paidCells.reduce((s, c) => s + c.amount, 0);
@@ -98,13 +89,13 @@ function BillingPageInner() {
         <Card className="overflow-hidden">
           <CardHeader
             title="年間マトリクス"
-            description="請求は対象期間の最終月に立ちます（隔月なら2ヶ月分をまとめて請求）。請求額はクリックで編集。請＝請求済み（青）、入＝入金済み（緑）、期日超過は赤"
+            description="上段＝その月に立つ請求（額はクリックで編集・請＝請求済み）、下段＝その月に入る入金（入＝入金済み）。隔月などは対象期間の最終月にまとめて請求し、入金はその翌月以降に立ちます"
           />
           {rows.length === 0 ? (
             <EmptyState>表示できる顧客がありません。</EmptyState>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[1500px] text-sm">
+              <table className="w-full min-w-[1700px] text-sm">
                 <thead className="border-b border-line bg-canvas text-xs text-muted">
                   <tr>
                     <th className="sticky-col left-0 w-[4.5rem] min-w-[4.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
@@ -159,13 +150,14 @@ function BillingPageInner() {
                         {c.billingCycle?.name ?? "毎月"}
                       </td>
                       {MONTHS.map((m) => {
-                        const cell = cellFor(c, m);
-                        if (!cell.isTarget) {
+                        const billing = cellFor(c, m);
+                        const payment = paymentCellFor(c, m);
+                        if (!billing.isTarget && !payment) {
                           return (
                             <td
                               key={m}
                               className="border-l border-line bg-canvas px-1 py-1.5 text-center text-xs text-muted"
-                              title="請求サイクル対象外"
+                              title="請求・入金の予定なし"
                             >
                               −
                             </td>
@@ -173,23 +165,35 @@ function BillingPageInner() {
                         }
                         return (
                           <td key={m} className="border-l border-line px-1 py-1.5 align-top">
-                            <BillingCell
-                              customerId={c.id}
-                              customerName={c.name}
-                              year={period.year}
-                              month={m}
-                              amount={cell.amount}
-                              defaultAmount={cell.defaultAmount}
-                              isBilled={cell.isBilled}
-                              isPaid={cell.isPaid}
-                              isOverdue={cell.isOverdue}
-                              coveredMonths={cell.coveredMonths}
-                              paymentLagMonths={c.paymentLagMonths}
-                              isExpectedPaymentMonth={
-                                cell.expected.year === period.year &&
-                                cell.expected.month === period.month
-                              }
-                            />
+                            <div className="min-w-[6.5rem] space-y-1">
+                              {billing.isTarget && (
+                                <BillingBox
+                                  customerId={c.id}
+                                  customerName={c.name}
+                                  year={billing.year}
+                                  month={billing.month}
+                                  amount={billing.amount}
+                                  defaultAmount={billing.defaultAmount}
+                                  isBilled={billing.isBilled}
+                                  coveredMonths={billing.coveredMonths}
+                                  paymentLagMonths={c.paymentLagMonths}
+                                />
+                              )}
+                              {payment && (
+                                <PaymentBox
+                                  customerId={c.id}
+                                  customerName={c.name}
+                                  year={payment.year}
+                                  month={payment.month}
+                                  amount={payment.amount}
+                                  defaultAmount={payment.defaultAmount}
+                                  isPaid={payment.isPaid}
+                                  isOverdue={payment.isOverdue}
+                                  coveredMonths={payment.coveredMonths}
+                                  paymentLagMonths={c.paymentLagMonths}
+                                />
+                              )}
+                            </div>
                           </td>
                         );
                       })}
@@ -225,7 +229,8 @@ function BillingPageInner() {
 
       <Card>
         <CardHeader
-          title={`${formatYearMonth(period.year, period.month)}の請求リスト`}
+          title={`${formatYearMonth(period.year, period.month)}の請求・入金`}
+          description="請求はこの月に立つもの、入金はこの月に入るもの。隔月などは請求と入金が別の月になります"
           action={
             <div className="no-print inline-flex rounded-md border border-line p-0.5">
               {[
@@ -254,98 +259,157 @@ function BillingPageInner() {
             </div>
           }
         />
-        {listCells.length === 0 ? (
-          <EmptyState>該当する請求がありません。</EmptyState>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead className="border-b border-line bg-canvas text-xs text-muted">
-                <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
-                  <th>物件名</th>
-                  <th className="text-right!">請求額</th>
-                  <th className="text-center!">請求</th>
-                  <th>請求日</th>
-                  <th>入金予定月</th>
-                  <th className="text-center!">入金</th>
-                  <th>入金日</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listCells.map((cell) => (
-                  <tr key={cell.customer.id} className="border-b border-line last:border-0">
-                    <td className="px-2.5 py-2">
-                      <Link
-                        href={`/customers/edit?id=${cell.customer.id}`}
-                        className="font-medium text-brand hover:underline"
-                      >
-                        {cell.customer.name}
-                      </Link>
-                      {cell.isOverdue && (
-                        <Badge tone="danger" className="ml-1.5">
-                          期日超過 {cell.monthsOverdue}ヶ月
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="px-2.5 py-2">
-                      {cell.coveredMonths.length > 1 && (
-                        <div className="mb-0.5 text-xs text-muted">
+
+        {quick !== "unpaid" && (
+          <section>
+            <h3 className="border-b border-line bg-canvas px-4 py-1.5 text-xs font-medium text-muted">
+              {period.month}月に請求するもの
+            </h3>
+            {billingList.length === 0 ? (
+              <EmptyState>この月に立つ請求はありません。</EmptyState>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="border-b border-line text-xs text-muted">
+                    <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
+                      <th>物件名</th>
+                      <th>対象期間</th>
+                      <th className="text-right!">請求額</th>
+                      <th className="text-center!">請求</th>
+                      <th>請求日</th>
+                      <th>入金予定月</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {billingList.map((cell) => (
+                      <tr key={cell.customer.id} className="border-b border-line last:border-0">
+                        <td className="px-2.5 py-2">
+                          <Link
+                            href={`/customers/edit?id=${cell.customer.id}`}
+                            className="font-medium text-brand hover:underline"
+                          >
+                            {cell.customer.name}
+                          </Link>
+                        </td>
+                        <td className="px-2.5 py-2 text-xs text-muted">
                           {cell.coveredMonths.join("・")}月分
-                        </div>
-                      )}
-                      <BillingAmount
-                        customerId={cell.customer.id}
-                        customerName={cell.customer.name}
-                        year={period.year}
-                        month={period.month}
-                        amount={cell.amount}
-                        defaultAmount={cell.defaultAmount}
-                        paymentLagMonths={cell.customer.paymentLagMonths}
-                        className="text-sm"
-                      />
-                    </td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex justify-center">
-                        <BilledCheck
-                          customerId={cell.customer.id}
-                          customerName={cell.customer.name}
-                          year={period.year}
-                          month={period.month}
-                          defaultAmount={cell.defaultAmount}
-                          paymentLagMonths={cell.customer.paymentLagMonths}
-                          isBilled={cell.isBilled}
-                          label="請求済み"
-                        />
-                      </div>
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-xs">
-                      {formatDate(cell.billedDate)}
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-xs">
-                      {formatYearMonth(cell.expected.year, cell.expected.month)}
-                    </td>
-                    <td className="px-2.5 py-2">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <PaidCheck
-                          customerId={cell.customer.id}
-                          customerName={cell.customer.name}
-                          year={period.year}
-                          month={period.month}
-                          defaultAmount={cell.defaultAmount}
-                          paymentLagMonths={cell.customer.paymentLagMonths}
-                          isPaid={cell.isPaid}
-                          label="入金済み"
-                        />
-                        {!cell.isPaid && cell.isOverdue && <Badge tone="danger">超過</Badge>}
-                      </div>
-                    </td>
-                    <td className="tabular px-2.5 py-2 text-xs">{formatDate(cell.paidDate)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-2.5 py-2">
+                          <BillingAmount
+                            customerId={cell.customer.id}
+                            customerName={cell.customer.name}
+                            year={cell.year}
+                            month={cell.month}
+                            amount={cell.amount}
+                            defaultAmount={cell.defaultAmount}
+                            paymentLagMonths={cell.customer.paymentLagMonths}
+                            className="text-sm"
+                          />
+                        </td>
+                        <td className="px-2.5 py-2">
+                          <div className="flex justify-center">
+                            <BilledCheck
+                              customerId={cell.customer.id}
+                              customerName={cell.customer.name}
+                              year={cell.year}
+                              month={cell.month}
+                              defaultAmount={cell.defaultAmount}
+                              paymentLagMonths={cell.customer.paymentLagMonths}
+                              isBilled={cell.isBilled}
+                              label="請求済み"
+                            />
+                          </div>
+                        </td>
+                        <td className="tabular px-2.5 py-2 text-xs">
+                          {formatDate(cell.billedDate)}
+                        </td>
+                        <td className="tabular px-2.5 py-2 text-xs">
+                          {formatYearMonth(cell.expected.year, cell.expected.month)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {quick !== "unbilled" && (
+          <section>
+            <h3 className="border-y border-line bg-canvas px-4 py-1.5 text-xs font-medium text-muted">
+              {period.month}月に入金されるもの
+            </h3>
+            {paymentList.length === 0 ? (
+              <EmptyState>この月に入る入金はありません。</EmptyState>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm">
+                  <thead className="border-b border-line text-xs text-muted">
+                    <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
+                      <th>物件名</th>
+                      <th>対象期間</th>
+                      <th>請求月</th>
+                      <th className="text-right!">入金額</th>
+                      <th className="text-center!">入金</th>
+                      <th>入金日</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paymentList.map((cell) => (
+                      <tr key={cell.customer.id} className="border-b border-line last:border-0">
+                        <td className="px-2.5 py-2">
+                          <Link
+                            href={`/customers/edit?id=${cell.customer.id}`}
+                            className="font-medium text-brand hover:underline"
+                          >
+                            {cell.customer.name}
+                          </Link>
+                          {cell.isOverdue && (
+                            <Badge tone="danger" className="ml-1.5">
+                              期日超過 {cell.monthsOverdue}ヶ月
+                            </Badge>
+                          )}
+                        </td>
+                        <td className="px-2.5 py-2 text-xs text-muted">
+                          {cell.coveredMonths.join("・")}月分
+                        </td>
+                        <td className="tabular px-2.5 py-2 text-xs">
+                          {formatYearMonth(cell.year, cell.month)}
+                          {!cell.isBilled && (
+                            <Badge className="ml-1.5">未請求</Badge>
+                          )}
+                        </td>
+                        <td className="tabular px-2.5 py-2 text-right">
+                          {formatYen(cell.amount)}
+                        </td>
+                        <td className="px-2.5 py-2">
+                          <div className="flex justify-center">
+                            <PaidCheck
+                              customerId={cell.customer.id}
+                              customerName={cell.customer.name}
+                              year={cell.year}
+                              month={cell.month}
+                              defaultAmount={cell.defaultAmount}
+                              paymentLagMonths={cell.customer.paymentLagMonths}
+                              isPaid={cell.isPaid}
+                              label="入金済み"
+                            />
+                          </div>
+                        </td>
+                        <td className="tabular px-2.5 py-2 text-xs">
+                          {formatDate(cell.paidDate)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         )}
       </Card>
+
     </div>
   );
 }

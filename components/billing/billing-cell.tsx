@@ -69,7 +69,7 @@ export function PaidCheck({
         onChange={(e) =>
           update((doc) => setPaid(doc, { ...common, isPaid: e.target.checked }))
         }
-        aria-label={`${props.customerName} ${props.year}年${props.month}月 入金済み`}
+        aria-label={`${props.customerName} ${props.year}年${props.month}月分 入金済み`}
       />
       {label ?? "入"}
     </label>
@@ -123,42 +123,68 @@ export function BillingAmount({
   );
 }
 
-/** §5.6 年間マトリクスの各月セル */
-export function BillingCell({
+/**
+ * 年間マトリクスの上段：この月に「立つ」請求。
+ * 請求額と請求済みチェックだけを持つ。
+ */
+export function BillingBox({
   amount,
   isBilled,
-  isPaid,
-  isOverdue,
-  isExpectedPaymentMonth,
   coveredMonths,
   ...props
 }: BillingKeyProps & {
   amount: number;
   isBilled: boolean;
-  isPaid: boolean;
-  isOverdue: boolean;
-  isExpectedPaymentMonth?: boolean;
   coveredMonths?: number[];
 }) {
   return (
-    <div
-      className={cn(
-        "min-w-[5.25rem] rounded px-1 py-1",
-        // 請求済み＝青、入金済み＝緑、未入金かつ期日超過＝赤
-        isOverdue && "bg-danger-soft",
-        !isOverdue && isPaid && "bg-ok-soft",
-        !isOverdue && !isPaid && isBilled && "bg-brand-soft",
-        isExpectedPaymentMonth && "ring-1 ring-brand/40 ring-inset",
-      )}
-    >
+    <div className={cn("rounded px-1 py-1", isBilled && "bg-brand-soft")}>
       {coveredMonths && coveredMonths.length > 1 && (
         <div className="text-center text-[10px] leading-tight text-muted">
           {coveredMonths.join("・")}月分
         </div>
       )}
-      <BillingAmount {...props} amount={amount} />
-      <div className="mt-0.5 flex items-center justify-center gap-2">
+      <div className="flex items-center gap-1">
+        <BillingAmount {...props} amount={amount} className="flex-1" />
         <BilledCheck {...props} isBilled={isBilled} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 年間マトリクスの下段：この月に「入る」入金。
+ * 請求より paymentLagMonths ヶ月あとの月に現れるので、
+ * 何月分の入金なのかを必ず出す。請求額はここでは編集しない。
+ */
+export function PaymentBox({
+  amount,
+  isPaid,
+  isOverdue,
+  coveredMonths,
+  ...props
+}: BillingKeyProps & {
+  amount: number;
+  isPaid: boolean;
+  isOverdue: boolean;
+  coveredMonths: number[];
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded border border-dashed border-line px-1 py-1",
+        // 入金済み＝緑、未入金かつ期日超過＝赤
+        isPaid && "border-transparent bg-ok-soft",
+        !isPaid && isOverdue && "border-transparent bg-danger-soft",
+      )}
+    >
+      <div className="text-center text-[10px] leading-tight text-muted">
+        {coveredMonths.join("・")}月分 入金
+      </div>
+      <div className="flex items-center gap-1">
+        <span className="tabular flex-1 text-right text-xs text-muted">
+          {formatYen(amount)}
+        </span>
         <PaidCheck {...props} isPaid={isPaid} />
       </div>
     </div>

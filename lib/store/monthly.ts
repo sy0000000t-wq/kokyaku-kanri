@@ -6,7 +6,7 @@ import {
   isPaymentOverdue,
   monthsOverdue,
 } from "@/lib/calc/billing";
-import { getInspectionTarget, type YearMonth } from "@/lib/calc/schedule";
+import { addMonths, getInspectionTarget, type YearMonth } from "@/lib/calc/schedule";
 import type {
   AppDocument,
   BillingRecord,
@@ -33,6 +33,9 @@ export type InspectionCell = {
 
 export type BillingCell = {
   customer: CustomerView;
+  /** この請求が立つ年月（入金月とは異なる） */
+  year: number;
+  month: number;
   isTarget: boolean;
   /** この請求が何月分をまとめたものか（古い順） */
   coveredMonths: number[];
@@ -103,11 +106,15 @@ export function buildBillingGrid(
   today: YearMonth,
 ) {
   const records = new Map<string, BillingRecord>();
+  // 入金は請求の翌月以降に入るため、年をまたぐ請求（12月請求→翌1月入金）も引けるようにする
+  const allRecords = new Map<string, BillingRecord>();
   for (const r of doc.billingRecords) {
+    allRecords.set(`${r.customerId}:${r.year}:${r.month}`, r);
     if (r.year === year) records.set(billingKey(r.customerId, r.month), r);
   }
 
-  const cellFor = (customer: CustomerView, month: number): BillingCell => {
+  /** 任意の年月の請求セルを組み立てる */
+  const cellAt = (customer: CustomerView, ym: YearMonth): BillingCell => {
     const isTarget = isBillingTarget(
       {
         isActive: customer.isActive,
@@ -115,7 +122,7 @@ export function buildBillingGrid(
         contractEndDate: customer.contractEndDate,
         billingMonths: customer.billingMonths,
       },
-      { year, month },
+      ym,
     );
 
     const defaultAmount = calcDefaultBillingAmount({
@@ -123,23 +130,25 @@ export function buildBillingGrid(
       annualFeeHandling: customer.annualFeeHandling,
       annualInspectionFeeIncl: customer.pricing.annualInspectionFeeIncl,
       annualInspectionMonth: customer.annualInspectionMonth,
-      targetMonth: month,
+      targetMonth: ym.month,
       // 隔月・3ヶ月請求などは、その回でまとめて請求する
       billingIntervalMonths: customer.billingCycle?.intervalMonths ?? 1,
     });
 
-    const record = records.get(billingKey(customer.id, month)) ?? null;
+    const record = allRecords.get(`${customer.id}:${ym.year}:${ym.month}`) ?? null;
     const expected = record
       ? { year: record.expectedPaymentYear, month: record.expectedPaymentMonth }
-      : calcExpectedPayment({ year, month }, customer.paymentLagMonths);
+      : calcExpectedPayment(ym, customer.paymentLagMonths);
 
     const isPaid = !!record?.isPaid;
     const isBilled = !!record?.isBilled;
 
     return {
       customer,
+      year: ym.year,
+      month: ym.month,
       isTarget,
-      coveredMonths: billedMonths(month, customer.billingCycle?.intervalMonths ?? 1),
+      coveredMonths: billedMonths(ym.month, customer.billingCycle?.intervalMonths ?? 1),
       amount: record?.billingAmount ?? defaultAmount,
       defaultAmount,
       isBilled,
@@ -154,7 +163,22 @@ export function buildBillingGrid(
     };
   };
 
-  return { records, cellFor };
+  /** この月に「立つ」請求 */
+  const cellFor = (customer: CustomerView, month: number): BillingCell =>
+    cellAt(customer, { year, month });
+
+  /**
+   * この月に「入る」入金。
+   * 入金は請求の paymentLagMonths ヶ月後なので、さかのぼった月の請求を引く。
+   * 対象がなければ null。
+   */
+  const paymentCellFor = (customer: CustomerView, month: number): BillingCell | null => {
+    const source = addMonths({ year, month }, -customer.paymentLagMonths);
+    const cell = cellAt(customer, source);
+    return cell.isTarget ? cell : null;
+  };
+
+  return { records, cellFor, cellAt, paymentCellFor };
 }
 
 /** 今月サマリー */
