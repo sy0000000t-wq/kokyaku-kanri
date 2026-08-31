@@ -49,6 +49,12 @@ type StoreValue = {
   updateWith: <T>(fn: (doc: AppDocument) => { doc: AppDocument; result: T }) => T;
   /** 保存先から読み直す（競合を解消するとき） */
   reload: () => Promise<void>;
+  /** 競合時：ドライブの内容を採る（この端末の未送信分は破棄） */
+  takeRemote: () => Promise<void>;
+  /** 競合時：この端末の変更を採る（ドライブ側を上書き） */
+  keepLocal: () => Promise<void>;
+  /** まだ送れていない変更があるか */
+  hasPendingChanges: boolean;
   /** 文書を丸ごと差し替える（インポート） */
   replace: (doc: AppDocument) => void;
   /** Google のクライアントIDが設定されているか */
@@ -90,6 +96,8 @@ export function StoreProvider({
   const pendingRef = useRef<AppDocument | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flushRef = useRef<(() => Promise<void>) | null>(null);
+  /** 競合したときの、ドライブ側の内容。「取り込む」を選んだら使う */
+  const remoteDocRef = useRef<AppDocument | null>(null);
   /**
    * 最初の読み込みが終わるまで保存しない。
    * 読み込み前は「まっさらな初期データ」を持っているので、
@@ -194,12 +202,16 @@ export function StoreProvider({
       setStatus("offline");
       setMessage("オフラインです。変更はこの端末に保存され、接続が戻ったら送信します。");
     } else if (result.status === "conflict") {
+      // 送れなかった変更は手元に残しておく。ここで捨てると入力が消える
+      pendingRef.current = next;
       setStatus("conflict");
       setMessage(
-        "保存先の内容が変わっているため、上書きせずに止めました。" +
-          "読み込み直すと最新の内容になります（この端末の変更は反映されません）。",
+        "ほかの端末でも更新されているため、上書きせずに止めました。" +
+          "どちらを残すか選んでください。",
       );
     } else {
+      // エラーでも同じ。次の機会に送り直せるようにしておく
+      pendingRef.current = next;
       setStatus("error");
       setMessage(result.message);
     }
@@ -258,15 +270,32 @@ export function StoreProvider({
     [scheduleSave],
   );
 
-  const reload = useCallback(async () => {
+  /**
+   * ドライブの内容を取り込む（この端末の未送信の変更は破棄される）。
+   * 競合したときの選択肢の片方。
+   */
+  const takeRemote = useCallback(async () => {
     setStatus("loading");
     try {
-      const loaded = await backendRef.current.load();
-      if (loaded) {
-        setDoc(loaded.doc);
-        revisionRef.current = loaded.revision;
+      const remote = remoteDocRef.current;
+      if (remote) {
+        // 競合の判定時に読んだ内容をそのまま採用する
+        setDoc(remote);
+        clearMirror();
+        pendingRef.current = null;
+        remoteDocRef.current = null;
+        // 取り込んだ内容を控えにも書き直す
+        const result = await backendRef.current.save(remote, revisionRef.current);
+        if (result.status === "saved") revisionRef.current = result.revision;
+      } else {
+        clearMirror();
+        pendingRef.current = null;
+        const loaded = await backendRef.current.load();
+        if (loaded) {
+          setDoc(loaded.doc);
+          revisionRef.current = loaded.revision;
+        }
       }
-      pendingRef.current = null;
       readyRef.current = true;
       setStatus("ready");
       setMessage(null);
@@ -275,6 +304,39 @@ export function StoreProvider({
       setMessage(`読み込めませんでした: ${(e as Error).message}`);
     }
   }, []);
+
+  /**
+   * この端末の変更をドライブへ送る（ドライブ側の変更は上書きされる）。
+   * 競合したときの選択肢のもう片方。
+   */
+  const keepLocal = useCallback(async () => {
+    const backend = backendRef.current;
+    if (!(backend instanceof DriveBackend)) return;
+
+    setStatus("saving");
+    try {
+      const result = await backend.forceSave(pendingRef.current ?? doc);
+      if (result.status === "saved") {
+        revisionRef.current = result.revision;
+        pendingRef.current = null;
+        remoteDocRef.current = null;
+        setStatus("ready");
+        setMessage(null);
+      } else if (result.status === "offline") {
+        setStatus("offline");
+        setMessage("オフラインです。接続が戻ったら送信します。");
+      } else {
+        setStatus("error");
+        setMessage(result.status === "error" ? result.message : "送信できませんでした");
+      }
+    } catch (e) {
+      setStatus("error");
+      setMessage(`送信できませんでした: ${(e as Error).message}`);
+    }
+  }, [doc]);
+
+  /** 従来の「読み込み直す」。競合していないときの取り直しに使う */
+  const reload = takeRemote;
 
   const replace = useCallback(
     (next: AppDocument) => {
@@ -303,24 +365,52 @@ export function StoreProvider({
       const drive = new DriveBackend(auth);
       await drive.ensureSignedIn();
 
-      const loaded = await drive.load();
-      if (loaded) {
-        setDoc(loaded.doc);
-        revisionRef.current = loaded.revision;
-      } else {
-        // 初回：いま手元にある内容をそのままドライブへ移す
-        const result = await drive.save(doc, null);
-        if (result.status === "error") throw new Error(result.message);
-        revisionRef.current =
-          result.status === "saved" ? result.revision : revisionRef.current;
-      }
-
       authRef.current = auth;
       backendRef.current = drive;
       window.localStorage.setItem(DRIVE_FLAG, "1");
       readyRef.current = true;
       setDriveConnected(true);
+
+      const loaded = await drive.load();
+
+      if (!loaded) {
+        // 初回：いま手元にある内容をそのままドライブへ移す
+        const result = await drive.save(doc, null);
+        if (result.status === "error") throw new Error(result.message);
+        revisionRef.current =
+          result.status === "saved" ? result.revision : revisionRef.current;
+        setStatus("ready");
+        return;
+      }
+
+      revisionRef.current = loaded.revision;
+
+      if (loaded.conflictWithLocal) {
+        // 手元の内容を表示したまま、どちらを残すか選んでもらう
+        setDoc(loaded.doc);
+        remoteDocRef.current = loaded.remoteDoc ?? null;
+        pendingRef.current = loaded.doc;
+        setStatus("conflict");
+        setMessage(
+          "この端末の未送信の変更と、ドライブ側の更新が食い違っています。" +
+            "どちらを残すか選んでください。",
+        );
+        return;
+      }
+
+      if (loaded.pendingLocalChanges) {
+        // サインインが切れている間に入力した分がある。取り込まずに送る
+        setDoc(loaded.doc);
+        pendingRef.current = loaded.doc;
+        setStatus("ready");
+        setMessage(null);
+        await flushRef.current?.();
+        return;
+      }
+
+      setDoc(loaded.doc);
       setStatus("ready");
+      setMessage(null);
     } catch (e) {
       setStatus("error");
       setMessage(`ドライブに繋げませんでした: ${(e as Error).message}`);
@@ -365,6 +455,9 @@ export function StoreProvider({
       update,
       updateWith,
       reload,
+      takeRemote,
+      keepLocal,
+      hasPendingChanges: pendingRef.current != null,
       replace,
       driveAvailable: CLIENT_ID !== "",
       driveConnected,
@@ -379,6 +472,8 @@ export function StoreProvider({
       update,
       updateWith,
       reload,
+      takeRemote,
+      keepLocal,
       replace,
       driveConnected,
       connectDrive,

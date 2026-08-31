@@ -27,6 +27,8 @@ export type LoadResult = {
   pendingLocalChanges?: boolean;
   /** 手元とドライブの両方が進んでいる */
   conflictWithLocal?: boolean;
+  /** 競合時の、ドライブ側の内容。取り込むほうを選んだときに使う */
+  remoteDoc?: AppDocument;
 };
 
 export type SaveResult =

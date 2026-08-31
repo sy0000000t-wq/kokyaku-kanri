@@ -3,9 +3,17 @@
   "configurations": [
     {
       "name": "customer-manager",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "port": 3000
+      "runtimeExecutable": "/Users/dokosyota/Claude/開発/顧客管理/scripts/dev.sh",
+      "runtimeArgs": [],
+      "port": 3100,
+      "autoPort": true
+    },
+    {
+      "name": "tenken-app",
+      "runtimeExecutable": "/Users/dokosyota/Claude/開発/tenken-app/serve.sh",
+      "runtimeArgs": [],
+      "port": 3200,
+      "autoPort": true
     }
   ]
 }

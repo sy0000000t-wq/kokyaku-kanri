@@ -97,12 +97,20 @@ export class DriveBackend implements DocumentBackend {
 
       const mirror = readMirror();
       if (mirror?.pending) {
-        // 圏外中に変えた分がまだ残っている。ドライブ側が進んでいなければ手元を優先する
+        // 未送信の変更が手元にある。ドライブ側が進んでいなければ手元を優先する
         if (mirror.revision === revision) {
           return { doc: mirror.doc, revision, pendingLocalChanges: true };
         }
-        // 両方進んでいる＝競合。ドライブ側を返し、判断は呼び出し側に任せる
-        return { doc, revision, conflictWithLocal: true };
+        // 両方が進んでいる＝競合。
+        // ここでドライブ側を表示すると入力したばかりの内容が画面から消えるので、
+        // 手元を表示したまま競合を知らせ、どちらを採るかは利用者に選んでもらう。
+        return {
+          doc: mirror.doc,
+          revision,
+          conflictWithLocal: true,
+          pendingLocalChanges: true,
+          remoteDoc: doc,
+        };
       }
 
       writeMirror(doc, revision, false);
@@ -153,8 +161,11 @@ export class DriveBackend implements DocumentBackend {
   }
 
   async save(doc: AppDocument, expectedRevision: string | null): Promise<SaveResult> {
-    // 送れたかに関わらず、まず手元に残す（圏外でも失われないように）
-    writeMirror(doc, expectedRevision, true);
+    // 送れたかに関わらず、まず手元に残す（圏外でも失われないように）。
+    // 版は「どこから変更したか」の起点なので、分からないときは前の値を保つ。
+    // ここを null で潰すと、次回の読み込みで誤って競合と判定される。
+    const base = expectedRevision ?? readMirror()?.revision ?? null;
+    writeMirror(doc, base, true);
 
     try {
       if (!this.fileId) {
@@ -190,19 +201,7 @@ export class DriveBackend implements DocumentBackend {
         return { status: "conflict", revision: current };
       }
 
-      const res = await this.fetchWithAuth(
-        `${DRIVE_UPLOAD}/files/${this.fileId}?uploadType=media&fields=id,version`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body,
-        },
-      );
-      if (!res.ok) await this.describe("保存できませんでした", res);
-
-      const saved = (await res.json()) as DriveFile;
-      writeMirror(doc, saved.version ?? null, false);
-      return { status: "saved", revision: saved.version ?? null };
+      return await this.patch(this.fileId, doc, body);
     } catch (e) {
       // 圏外は失敗ではなく「あとで送る」
       if (isOfflineError(e)) return { status: "offline" };
@@ -241,6 +240,51 @@ export class DriveBackend implements DocumentBackend {
     if (!res.ok) await this.describe("データファイルを作成できませんでした", res);
 
     return (await res.json()) as DriveFile;
+  }
+
+  /** 実際の書き込み。控えの版も更新して、未送信フラグを下ろす */
+  private async patch(
+    fileId: string,
+    doc: AppDocument,
+    body: string,
+  ): Promise<SaveResult> {
+    const res = await this.fetchWithAuth(
+      `${DRIVE_UPLOAD}/files/${fileId}?uploadType=media&fields=id,version`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body,
+      },
+    );
+    if (!res.ok) await this.describe("保存できませんでした", res);
+
+    const saved = (await res.json()) as DriveFile;
+    writeMirror(doc, saved.version ?? null, false);
+    return { status: "saved", revision: saved.version ?? null };
+  }
+
+  /**
+   * 版の照合をせずに書き込む。
+   * 競合したときに、利用者が「この端末の変更を採る」と決めた場合だけ使う。
+   */
+  async forceSave(doc: AppDocument): Promise<SaveResult> {
+    try {
+      if (!this.fileId) {
+        const found = await this.findFile();
+        this.fileId = found?.id ?? null;
+      }
+      const body = JSON.stringify(doc, null, 2);
+      if (!this.fileId) {
+        const created = await this.create(body);
+        this.fileId = created.id;
+        writeMirror(doc, created.version ?? null, false);
+        return { status: "saved", revision: created.version ?? null };
+      }
+      return await this.patch(this.fileId, doc, body);
+    } catch (e) {
+      if (isOfflineError(e)) return { status: "offline" };
+      return { status: "error", message: (e as Error).message };
+    }
   }
 
   /** サインイン直後に一度呼ぶ。ファイルの有無を確かめる */
