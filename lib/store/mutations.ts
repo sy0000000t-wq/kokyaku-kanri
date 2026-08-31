@@ -234,13 +234,33 @@ export function updateDistance(
   });
 }
 
-/** 顧客ID の自動採番（T01 形式） */
-export function nextCustomerCode(doc: AppDocument): string {
-  const max = doc.customers.reduce((acc, c) => {
-    const m = /^T(\d+)$/.exec(c.code);
-    return m ? Math.max(acc, Number(m[1])) : acc;
-  }, 0);
-  return `T${String(max + 1).padStart(2, "0")}`;
+/**
+ * 顧客ID の候補を作る。
+ *
+ * 契約年月日を YYMMDD にしたものを使う（2026-03-01 なら 260301）。
+ * 同じ日に複数の契約があるときは、末尾に a, b, c… を付けて重複を避ける。
+ * あくまで候補で、入力欄では自由に書き換えられる。
+ */
+export function suggestCustomerCode(
+  doc: AppDocument,
+  contractStartDate: string,
+  excludeId: number | null = null,
+): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(contractStartDate ?? "");
+  if (!m) return "";
+
+  const base = `${m[1].slice(2)}${m[2]}${m[3]}`;
+  const taken = new Set(
+    doc.customers.filter((c) => c.id !== excludeId).map((c) => c.code),
+  );
+  if (!taken.has(base)) return base;
+
+  // a, b, c… の順に空いているものを探す
+  for (let i = 0; i < 26; i++) {
+    const candidate = base + String.fromCharCode(97 + i);
+    if (!taken.has(candidate)) return candidate;
+  }
+  return base;
 }
 
 /* --------------------------------- 点検実績 --------------------------------- */

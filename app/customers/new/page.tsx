@@ -5,7 +5,8 @@ import { CustomerForm } from "@/components/customers/customer-form";
 import { emptyCustomer } from "@/lib/customer-form-types";
 import { useStore } from "@/lib/store/context";
 import { toFormMasters } from "@/lib/store/form-masters";
-import { nextCustomerCode } from "@/lib/store/mutations";
+import { suggestCustomerCode } from "@/lib/store/mutations";
+import { todayIso } from "@/lib/utils";
 
 export default function NewCustomerPage() {
   const { doc, indexes } = useStore();
@@ -21,7 +22,7 @@ export default function NewCustomerPage() {
       </div>
       <CustomerForm
         masters={masters}
-        initial={emptyCustomer(masters, nextCustomerCode(doc))}
+        initial={emptyCustomer(masters, suggestCustomerCode(doc, todayIso()))}
       />
     </div>
   );

@@ -5,7 +5,7 @@ import {
   deleteCategoryCycle,
   deleteCustomer,
   extractCustomer,
-  nextCustomerCode,
+  suggestCustomerCode,
   saveCoefficientRows,
   saveCustomer,
   setBilled,
@@ -173,18 +173,32 @@ describe("saveCustomer", () => {
   });
 });
 
-describe("nextCustomerCode", () => {
-  it("T01 形式で採番する", () => {
+describe("suggestCustomerCode（契約年月日から作る）", () => {
+  it("契約年月日を YYMMDD にする", () => {
     const doc = createInitialDocument();
-    expect(nextCustomerCode(doc)).toBe("T01");
-    const { doc: one } = saveCustomer(doc, input(doc));
-    expect(nextCustomerCode(one)).toBe("T02");
+    expect(suggestCustomerCode(doc, "2026-03-01")).toBe("260301");
+    expect(suggestCustomerCode(doc, "2026-12-25")).toBe("261225");
   });
 
-  it("欠番があっても最大値の次を返す", () => {
+  it("同じ日に複数あるときは a, b, c… を付ける", () => {
     const doc = createInitialDocument();
-    const { doc: a } = saveCustomer(doc, input(doc, { code: "T09" }));
-    expect(nextCustomerCode(a)).toBe("T10");
+    const { doc: one } = saveCustomer(doc, input(doc, { code: "260301" }));
+    expect(suggestCustomerCode(one, "2026-03-01")).toBe("260301a");
+
+    const { doc: two } = saveCustomer(one, input(one, { code: "260301a" }));
+    expect(suggestCustomerCode(two, "2026-03-01")).toBe("260301b");
+  });
+
+  it("自分自身の顧客IDは重複とみなさない（編集中）", () => {
+    const doc = createInitialDocument();
+    const { doc: saved, customerId } = saveCustomer(doc, input(doc, { code: "260301" }));
+    expect(suggestCustomerCode(saved, "2026-03-01", customerId)).toBe("260301");
+  });
+
+  it("日付が無ければ候補を出さない", () => {
+    const doc = createInitialDocument();
+    expect(suggestCustomerCode(doc, "")).toBe("");
+    expect(suggestCustomerCode(doc, "not-a-date")).toBe("");
   });
 });
 

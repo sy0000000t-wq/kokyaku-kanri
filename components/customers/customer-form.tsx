@@ -9,6 +9,7 @@ import {
   deleteCustomer,
   extractCustomer,
   saveCustomer,
+  suggestCustomerCode,
   type CustomerInput,
 } from "@/lib/store/mutations";
 import { validateCustomer, type ValidationErrors } from "@/lib/store/validation";
@@ -65,6 +66,8 @@ export function CustomerForm({
   );
   const [months, setMonths] = useState<number[]>(initial.inspectionMonths);
   const [dirty, setDirty] = useState(false);
+  // 顧客IDは契約年月日から作る。手で書き換えたら以後は追随させない
+  const [codeEdited, setCodeEdited] = useState(initial.id != null);
   // React 19 は action 実行後に未制御フィールドをリセットするため、
   // 検証エラーで入力が消えないよう全項目を制御コンポーネントにする
   const [fields, setFields] = useState({
@@ -248,7 +251,15 @@ export function CustomerForm({
             <CardHeader title="基本情報" />
             <div className="grid gap-3 p-4 sm:grid-cols-2">
               <Field label="顧客ID" required>
-                <Input name="code" {...bind("code")} className="font-mono" />
+                <Input
+                  name="code"
+                  className="font-mono"
+                  value={fields.code}
+                  onChange={(e) => {
+                    setCodeEdited(true);
+                    setFields((prev) => ({ ...prev, code: e.target.value }));
+                  }}
+                />
                 {err("code")}
               </Field>
               <Field label="物件名称（事業場名）" required className="sm:col-span-2">
@@ -449,8 +460,16 @@ export function CustomerForm({
                   type="date"
                   value={contractStartDate}
                   onChange={(e) => {
-                    setContractStartDate(e.target.value);
-                    presetMonths(inspectionCycleId, e.target.value);
+                    const next = e.target.value;
+                    setContractStartDate(next);
+                    presetMonths(inspectionCycleId, next);
+                    // 顧客IDを手で決めていなければ、契約年月日に合わせる
+                    if (!codeEdited) {
+                      const suggested = suggestCustomerCode(doc, next, initial.id);
+                      if (suggested) {
+                        setFields((prev) => ({ ...prev, code: suggested }));
+                      }
+                    }
                   }}
                 />
                 {err("contractStartDate")}

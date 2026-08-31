@@ -25,7 +25,6 @@ const auth = { getToken: async () => ({ accessToken: "t", expiresAt: Date.now() 
 function docWith(names: string[]): AppDocument {
   const doc = createInitialDocument();
   doc.customers = names.map((name, i) => ({
-    ...({} as never),
     id: i + 1,
     code: `T0${i + 1}`,
     name,
