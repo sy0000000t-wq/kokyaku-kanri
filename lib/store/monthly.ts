@@ -1,4 +1,5 @@
 import {
+  billedMonths,
   calcDefaultBillingAmount,
   calcExpectedPayment,
   isBillingTarget,
@@ -33,6 +34,8 @@ export type InspectionCell = {
 export type BillingCell = {
   customer: CustomerView;
   isTarget: boolean;
+  /** この請求が何月分をまとめたものか（古い順） */
+  coveredMonths: number[];
   amount: number;
   defaultAmount: number;
   isBilled: boolean;
@@ -136,6 +139,7 @@ export function buildBillingGrid(
     return {
       customer,
       isTarget,
+      coveredMonths: billedMonths(month, customer.billingCycle?.intervalMonths ?? 1),
       amount: record?.billingAmount ?? defaultAmount,
       defaultAmount,
       isBilled,

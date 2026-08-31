@@ -111,6 +111,7 @@ export function createInitialDocument(): AppDocument {
     customerInspectionMonths: [],
     inspectionRecords: [],
     billingRecords: [],
+    monthlyNotes: [],
   };
 }
 
@@ -170,5 +171,6 @@ export function parseDocument(raw: unknown): AppDocument {
     customerInspectionMonths: list("customerInspectionMonths"),
     inspectionRecords: list("inspectionRecords"),
     billingRecords: list("billingRecords"),
+    monthlyNotes: list("monthlyNotes"),
   };
 }

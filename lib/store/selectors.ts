@@ -6,6 +6,7 @@ import {
 } from "@/lib/calc/coefficient";
 import { calcPricing, type PricingResult } from "@/lib/calc/pricing";
 import { generateCycleMonths, parseYearMonth } from "@/lib/calc/schedule";
+import { generateBillingMonths } from "@/lib/calc/billing";
 import type {
   AppDocument,
   BillingCycle,
@@ -169,7 +170,8 @@ export function buildCustomerView(
   });
 
   const startMonth = parseYearMonth(customer.contractStartDate)?.month ?? 1;
-  const billingMonths = generateCycleMonths(
+  // 請求は対象期間の最終月に行う（隔月なら2ヶ月分をまとめて2ヶ月目に請求）
+  const billingMonths = generateBillingMonths(
     startMonth,
     billingCycle?.intervalMonths ?? 1,
   );

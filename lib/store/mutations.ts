@@ -310,6 +310,78 @@ export function setInspectionDone(
   return touch({ ...doc, inspectionRecords: records });
 }
 
+/* ---------------------------------- 覚書 ---------------------------------- */
+
+/**
+ * 点検1件ごとの覚書。持ち物やいつもと違う作業を、点検月に忘れないように残す。
+ * 実績レコードと同じ単位（顧客×年月×種別）で持つ。
+ */
+export function setInspectionNote(
+  doc: AppDocument,
+  input: {
+    customerId: number;
+    year: number;
+    month: number;
+    type: InspectionType;
+    note: string;
+  },
+): AppDocument {
+  const found = doc.inspectionRecords.find(
+    (r) =>
+      r.customerId === input.customerId &&
+      r.year === input.year &&
+      r.month === input.month &&
+      r.type === input.type,
+  );
+
+  const note = input.note.trim() === "" ? null : input.note;
+
+  const records = found
+    ? doc.inspectionRecords.map((r) => (r.id === found.id ? { ...r, note } : r))
+    : [
+        ...doc.inspectionRecords,
+        {
+          id: nextId(doc.inspectionRecords),
+          customerId: input.customerId,
+          year: input.year,
+          month: input.month,
+          type: input.type,
+          isDone: 0,
+          doneDate: null,
+          note,
+        },
+      ];
+
+  return touch({ ...doc, inspectionRecords: records });
+}
+
+/** 月ごとの覚書（その月の重点実施項目など） */
+export function setMonthlyNote(
+  doc: AppDocument,
+  input: { year: number; month: number; note: string },
+): AppDocument {
+  const others = doc.monthlyNotes.filter(
+    (n) => !(n.year === input.year && n.month === input.month),
+  );
+  const note = input.note.trim();
+
+  return touch({
+    ...doc,
+    monthlyNotes: note === "" ? others : [...others, { ...input, note }],
+  });
+}
+
+/** 指定年月の覚書を取り出す */
+export function getMonthlyNote(
+  doc: AppDocument,
+  year: number,
+  month: number,
+): string {
+  return (
+    doc.monthlyNotes.find((n) => n.year === year && n.month === month)?.note ?? ""
+  );
+}
+
 /* ------------------------------- 請求・入金実績 ------------------------------- */
 
 type BillingKey = { customerId: number; year: number; month: number };

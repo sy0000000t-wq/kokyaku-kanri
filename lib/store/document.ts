@@ -181,6 +181,13 @@ export type BillingRecord = {
   note: string | null;
 };
 
+/** 月ごとの覚書。その月の重点実施項目など */
+export type MonthlyNote = {
+  year: number;
+  month: number;
+  note: string;
+};
+
 export type AppDocument = {
   version: number;
   /** 最後に保存した日時。競合時の表示に使う */
@@ -197,6 +204,7 @@ export type AppDocument = {
   customerInspectionMonths: CustomerInspectionMonth[];
   inspectionRecords: InspectionRecord[];
   billingRecords: BillingRecord[];
+  monthlyNotes: MonthlyNote[];
 };
 
 /** 採番。DB のオートインクリメントの代わり */

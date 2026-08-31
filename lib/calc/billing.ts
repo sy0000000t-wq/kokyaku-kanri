@@ -3,13 +3,47 @@ import {
   addMonths,
   compareYearMonth,
   generateCycleMonths,
+  normalizeMonth,
   isActiveInMonth,
   type ContractLike,
   type YearMonth,
 } from "./schedule";
 
 /** §4.5 請求月は点検月と同じロジック（契約開始月起点）で導出する */
-export const generateBillingMonths = generateCycleMonths;
+/**
+ * 請求月を出す。
+ *
+ * 請求は「対象期間の最終月」に行う（後払い）。
+ * 例）3月契約・隔月請求 → 3月4月分を4月に請求し、以後 6月・8月…
+ *     10月契約・3ヶ月請求 → 10〜12月分を12月に請求し、以後 3月・6月…
+ * 毎月請求のときは、その月のぶんをその月に請求する。
+ */
+export function generateBillingMonths(
+  contractStartMonth: number,
+  intervalMonths: number,
+): number[] {
+  if (!Number.isFinite(intervalMonths) || intervalMonths <= 0) return [];
+  const firstBillingMonth = normalizeMonth(
+    contractStartMonth + intervalMonths - 1,
+  );
+  return generateCycleMonths(firstBillingMonth, intervalMonths);
+}
+
+/**
+ * その請求が何月分をまとめたものかを返す（古い順）。
+ * 「3月4月分」のように画面へ出して、取り違えを防ぐために使う。
+ */
+export function billedMonths(
+  billingMonth: number,
+  intervalMonths: number,
+): number[] {
+  const months = Math.max(1, Math.round(intervalMonths || 1));
+  const out: number[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    out.push(normalizeMonth(billingMonth - i));
+  }
+  return out;
+}
 
 export type BillingTargetInput = ContractLike & {
   billingMonths: number[];

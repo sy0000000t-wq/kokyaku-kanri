@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  billedMonths,
   calcDefaultBillingAmount,
   calcExpectedPayment,
+  generateBillingMonths,
   isBillingTarget,
   isPaymentOverdue,
   monthsOverdue,
@@ -151,5 +153,79 @@ describe("入金予定と未入金判定 §4.5", () => {
   it("経過月数", () => {
     expect(monthsOverdue({ year: 2026, month: 5 }, { year: 2026, month: 8 })).toBe(3);
     expect(monthsOverdue({ year: 2026, month: 5 }, { year: 2026, month: 4 })).toBe(0);
+  });
+});
+
+describe("請求月は対象期間の最終月（後払い）", () => {
+  it("3月契約・隔月請求 → 4月・6月・8月…に請求する", () => {
+    // 3月4月分を4月に請求。翌月入金なら5月に入金
+    expect(generateBillingMonths(3, 2)).toEqual([2, 4, 6, 8, 10, 12]);
+  });
+
+  it("10月契約・3ヶ月請求 → 12月・3月・6月・9月に請求する", () => {
+    // 10〜12月分を12月に請求。翌月入金なら1月に入金
+    expect(generateBillingMonths(10, 3)).toEqual([3, 6, 9, 12]);
+  });
+
+  it("毎月請求は契約月からその月ごと", () => {
+    expect(generateBillingMonths(4, 1)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it("6ヶ月請求は契約月の5ヶ月後から", () => {
+    expect(generateBillingMonths(4, 6)).toEqual([3, 9]);
+  });
+
+  it("実施なし（0）は請求しない", () => {
+    expect(generateBillingMonths(3, 0)).toEqual([]);
+  });
+});
+
+describe("billedMonths：その請求が何月分か", () => {
+  it("隔月請求の4月は、3月と4月の2ヶ月分", () => {
+    expect(billedMonths(4, 2)).toEqual([3, 4]);
+  });
+
+  it("3ヶ月請求の12月は、10・11・12月分", () => {
+    expect(billedMonths(12, 3)).toEqual([10, 11, 12]);
+  });
+
+  it("年をまたぐ場合も1〜12に収まる", () => {
+    expect(billedMonths(2, 3)).toEqual([12, 1, 2]);
+  });
+
+  it("毎月請求はその月だけ", () => {
+    expect(billedMonths(7, 1)).toEqual([7]);
+  });
+});
+
+describe("請求と入金のスケジュール（本人の運用に合わせた確認）", () => {
+  it("3月契約・隔月請求・翌月入金 → 4月請求5月入金、6月請求7月入金", () => {
+    const months = generateBillingMonths(3, 2);
+    expect(months).toContain(4);
+    expect(months).toContain(6);
+
+    expect(calcExpectedPayment({ year: 2026, month: 4 }, 1)).toEqual({
+      year: 2026,
+      month: 5,
+    });
+    expect(calcExpectedPayment({ year: 2026, month: 6 }, 1)).toEqual({
+      year: 2026,
+      month: 7,
+    });
+  });
+
+  it("10月契約・3ヶ月請求・翌月入金 → 12月請求1月入金、3月請求4月入金", () => {
+    const months = generateBillingMonths(10, 3);
+    expect(months).toContain(12);
+    expect(months).toContain(3);
+
+    expect(calcExpectedPayment({ year: 2026, month: 12 }, 1)).toEqual({
+      year: 2027,
+      month: 1,
+    });
+    expect(calcExpectedPayment({ year: 2027, month: 3 }, 1)).toEqual({
+      year: 2027,
+      month: 4,
+    });
   });
 });

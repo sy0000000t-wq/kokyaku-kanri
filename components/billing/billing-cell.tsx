@@ -130,6 +130,7 @@ export function BillingCell({
   isPaid,
   isOverdue,
   isExpectedPaymentMonth,
+  coveredMonths,
   ...props
 }: BillingKeyProps & {
   amount: number;
@@ -137,6 +138,7 @@ export function BillingCell({
   isPaid: boolean;
   isOverdue: boolean;
   isExpectedPaymentMonth?: boolean;
+  coveredMonths?: number[];
 }) {
   return (
     <div
@@ -149,6 +151,11 @@ export function BillingCell({
         isExpectedPaymentMonth && "ring-1 ring-brand/40 ring-inset",
       )}
     >
+      {coveredMonths && coveredMonths.length > 1 && (
+        <div className="text-center text-[10px] leading-tight text-muted">
+          {coveredMonths.join("・")}月分
+        </div>
+      )}
       <BillingAmount {...props} amount={amount} />
       <div className="mt-0.5 flex items-center justify-center gap-2">
         <BilledCheck {...props} isBilled={isBilled} />

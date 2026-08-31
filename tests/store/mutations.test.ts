@@ -12,6 +12,9 @@ import {
   setBillingAmount,
   setCustomerActive,
   setInspectionDone,
+  setInspectionNote,
+  setMonthlyNote,
+  getMonthlyNote,
   setPaid,
   updateDistance,
   type CustomerInput,
@@ -454,5 +457,78 @@ describe("validateCustomer", () => {
       annualInspectionFee: null,
     });
     expect(errors.annualInspectionFee).toBeDefined();
+  });
+});
+
+describe("覚書", () => {
+  it("点検1件ごとにメモを残せる", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+
+    const withNote = setInspectionNote(first, {
+      customerId,
+      year: 2026,
+      month: 9,
+      type: "regular",
+      note: "メガー持参。屋上の鍵を借りる",
+    });
+
+    expect(withNote.inspectionRecords).toHaveLength(1);
+    expect(withNote.inspectionRecords[0].note).toBe("メガー持参。屋上の鍵を借りる");
+    // 実施チェックは別物なので付かない
+    expect(withNote.inspectionRecords[0].isDone).toBe(0);
+  });
+
+  it("実施チェック済みの点検にもメモを足せる", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const key = { customerId, year: 2026, month: 9, type: "regular" as const };
+
+    const done = setInspectionDone(first, { ...key, isDone: true });
+    const withNote = setInspectionNote(done, { ...key, note: "次回は要清掃" });
+
+    expect(withNote.inspectionRecords).toHaveLength(1);
+    expect(withNote.inspectionRecords[0].isDone).toBe(1);
+    expect(withNote.inspectionRecords[0].note).toBe("次回は要清掃");
+  });
+
+  it("メモを空にすると消える", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const key = { customerId, year: 2026, month: 9, type: "regular" as const };
+
+    const withNote = setInspectionNote(first, { ...key, note: "あとで消す" });
+    const cleared = setInspectionNote(withNote, { ...key, note: "  " });
+
+    expect(cleared.inspectionRecords[0].note).toBeNull();
+  });
+
+  it("月ごとの覚書を年月で持てる", () => {
+    const doc = createInitialDocument();
+
+    const august = setMonthlyNote(doc, { year: 2026, month: 8, note: "重点は温度測定" });
+    const both = setMonthlyNote(august, { year: 2026, month: 9, note: "重点は電流測定" });
+
+    expect(getMonthlyNote(both, 2026, 8)).toBe("重点は温度測定");
+    expect(getMonthlyNote(both, 2026, 9)).toBe("重点は電流測定");
+    expect(getMonthlyNote(both, 2026, 10)).toBe("");
+    expect(both.monthlyNotes).toHaveLength(2);
+  });
+
+  it("同じ年月に書き直すと置き換わる", () => {
+    const doc = createInitialDocument();
+    const a = setMonthlyNote(doc, { year: 2026, month: 8, note: "温度測定" });
+    const b = setMonthlyNote(a, { year: 2026, month: 8, note: "温度測定と絶縁測定" });
+
+    expect(b.monthlyNotes).toHaveLength(1);
+    expect(getMonthlyNote(b, 2026, 8)).toBe("温度測定と絶縁測定");
+  });
+
+  it("空にすると月ごとの覚書も消える", () => {
+    const doc = createInitialDocument();
+    const a = setMonthlyNote(doc, { year: 2026, month: 8, note: "温度測定" });
+    const b = setMonthlyNote(a, { year: 2026, month: 8, note: "" });
+
+    expect(b.monthlyNotes).toHaveLength(0);
   });
 });

@@ -98,7 +98,7 @@ function BillingPageInner() {
         <Card className="overflow-hidden">
           <CardHeader
             title="年間マトリクス"
-            description="請求額はクリックで編集。請＝請求済み（青）、入＝入金済み（緑）、期日超過は赤"
+            description="請求は対象期間の最終月に立ちます（隔月なら2ヶ月分をまとめて請求）。請求額はクリックで編集。請＝請求済み（青）、入＝入金済み（緑）、期日超過は赤"
           />
           {rows.length === 0 ? (
             <EmptyState>表示できる顧客がありません。</EmptyState>
@@ -183,6 +183,7 @@ function BillingPageInner() {
                               isBilled={cell.isBilled}
                               isPaid={cell.isPaid}
                               isOverdue={cell.isOverdue}
+                              coveredMonths={cell.coveredMonths}
                               paymentLagMonths={c.paymentLagMonths}
                               isExpectedPaymentMonth={
                                 cell.expected.year === period.year &&
@@ -286,6 +287,11 @@ function BillingPageInner() {
                       )}
                     </td>
                     <td className="px-2.5 py-2">
+                      {cell.coveredMonths.length > 1 && (
+                        <div className="mb-0.5 text-xs text-muted">
+                          {cell.coveredMonths.join("・")}月分
+                        </div>
+                      )}
                       <BillingAmount
                         customerId={cell.customer.id}
                         customerName={cell.customer.name}

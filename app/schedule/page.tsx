@@ -5,6 +5,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { InspectionCheck } from "@/components/schedule/inspection-check";
+import { InspectionNote } from "@/components/schedule/inspection-note";
+import { MonthlyNote } from "@/components/schedule/monthly-note";
 import { PeriodNav } from "@/components/period-nav";
 import { ScopeFilter } from "@/components/scope-filter";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
@@ -221,6 +223,8 @@ function SchedulePageInner() {
         </Card>
       </div>
 
+      <MonthlyNote year={period.year} month={period.month} />
+
       {/* 当月リスト（モバイル主用途） */}
       <Card>
         <CardHeader
@@ -373,18 +377,29 @@ function InspectionListItem({
         )}
       </div>
 
-      <div className="flex items-center gap-3">
-        {cell.doneDate && (
-          <span className="tabular text-xs text-muted">{formatDate(cell.doneDate)}</span>
-        )}
-        <InspectionCheck
+      <div className="flex w-full flex-col gap-2 sm:w-64">
+        <div className="flex items-center justify-end gap-3">
+          {cell.doneDate && (
+            <span className="tabular text-xs text-muted">{formatDate(cell.doneDate)}</span>
+          )}
+          <InspectionCheck
+            customerId={c.id}
+            customerName={c.name}
+            year={period.year}
+            month={period.month}
+            type={cell.type}
+            isDone={cell.isDone}
+            label="実施済み"
+          />
+        </div>
+        {/* 訪問前に思い出したいことを、その月の予定に紐づけて残す */}
+        <InspectionNote
           customerId={c.id}
           customerName={c.name}
           year={period.year}
           month={period.month}
           type={cell.type}
-          isDone={cell.isDone}
-          label="実施済み"
+          note={cell.record?.note ?? null}
         />
       </div>
     </li>
