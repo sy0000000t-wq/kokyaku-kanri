@@ -48,8 +48,11 @@ export function CustomerForm({
   );
   const [inspectionCycleId, setInspectionCycleId] = useState(initial.inspectionCycleId);
   const [monthlyFee, setMonthlyFee] = useState(initial.monthlyFee.toString());
-  // 契約書どおりの金額を入れられるよう、税抜／税込を選べるようにする
-  const [feeTaxMode, setFeeTaxMode] = useState(initial.feeTaxMode);
+  // 契約書どおりの金額を入れられるよう、税抜／税込を金額ごとに選べるようにする
+  const [monthlyFeeTaxMode, setMonthlyFeeTaxMode] = useState(
+    initial.monthlyFeeTaxMode,
+  );
+  const [annualFeeTaxMode, setAnnualFeeTaxMode] = useState(initial.annualFeeTaxMode);
   const [annualFeeHandling, setAnnualFeeHandling] = useState(initial.annualFeeHandling);
   const [annualInspectionFee, setAnnualInspectionFee] = useState(
     initial.annualInspectionFee?.toString() ?? "",
@@ -105,7 +108,6 @@ export function CustomerForm({
   const [recalcPending, startRecalc] = useTransition();
 
   const cycle = masters.inspectionCycles.find((c) => c.id === inspectionCycleId);
-  const feeLabel = feeTaxMode === "included" ? "税込" : "税抜";
 
   // 設備ごとに点数を出して合算する（換算値算出フロー図 参考例1・2）
   const preview = useMemo(() => {
@@ -119,9 +121,10 @@ export function CustomerForm({
 
     const pricing = calcPricing({
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
-      feeTaxMode,
+      monthlyFeeTaxMode,
       annualFeeHandling,
       annualInspectionFee: annualInspectionFee === "" ? null : Number(annualInspectionFee),
+      annualFeeTaxMode,
       taxRate: masters.taxRate,
       points: total,
       unitPriceOverride:
@@ -132,7 +135,8 @@ export function CustomerForm({
   }, [
     facilities,
     monthlyFee,
-    feeTaxMode,
+    monthlyFeeTaxMode,
+    annualFeeTaxMode,
     annualFeeHandling,
     annualInspectionFee,
     useUnitPriceOverride,
@@ -165,10 +169,11 @@ export function CustomerForm({
       name: fields.name.trim(),
       inspectionCycleId,
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
-      feeTaxMode,
+      monthlyFeeTaxMode,
       annualFeeHandling,
       annualInspectionFee:
         annualFeeHandling === "separate" ? toNum(annualInspectionFee) : null,
+      annualFeeTaxMode,
       unitPriceOverride:
         useUnitPriceOverride && unitPriceOverride !== ""
           ? Number(unitPriceOverride)
@@ -328,38 +333,43 @@ export function CustomerForm({
           <Card>
             <CardHeader
               title="料金情報"
-              description="契約書に書かれている金額をそのまま入力できます"
+              description="契約書どおりの金額を入れてください。税抜・税込は金額ごとに選べます"
             />
             <div className="grid gap-3 p-4 sm:grid-cols-2">
               <Field
-                label="入力する金額"
+                label="月額（円）"
                 required
-                className="sm:col-span-2"
-                hint="下の月額と年次点検費を、どちらで入力するかを選びます。もう一方は自動で計算します"
+                hint={
+                  monthlyFeeTaxMode === "included"
+                    ? `税抜 ${formatYen(preview.pricing.monthlyExcl)}`
+                    : `税込 ${formatYen(preview.pricing.monthlyIncl)}`
+                }
               >
-                <Select
-                  value={feeTaxMode}
-                  onChange={(e) =>
-                    setFeeTaxMode(e.target.value as "excluded" | "included")
-                  }
-                >
-                  <option value="excluded">税抜で入力する</option>
-                  <option value="included">税込で入力する</option>
-                </Select>
-              </Field>
-
-              <Field label={`月額（${feeLabel}・円）`} required>
-                <Input
-                  name="monthlyFee"
-                  type="number"
-                  step="1"
-                  min="0"
-                  inputMode="numeric"
-                  value={monthlyFee}
-                  onChange={(e) => setMonthlyFee(e.target.value)}
-                />
+                <div className="flex gap-2">
+                  <Input
+                    name="monthlyFee"
+                    type="number"
+                    step="1"
+                    min="0"
+                    inputMode="numeric"
+                    value={monthlyFee}
+                    onChange={(e) => setMonthlyFee(e.target.value)}
+                  />
+                  <Select
+                    className="w-24 shrink-0"
+                    aria-label="月額が税抜か税込か"
+                    value={monthlyFeeTaxMode}
+                    onChange={(e) =>
+                      setMonthlyFeeTaxMode(e.target.value as "excluded" | "included")
+                    }
+                  >
+                    <option value="excluded">税抜</option>
+                    <option value="included">税込</option>
+                  </Select>
+                </div>
                 {err("monthlyFee")}
               </Field>
+
               <Field label="年次点検費の扱い" required>
                 <Select
                   name="annualFeeHandling"
@@ -372,17 +382,42 @@ export function CustomerForm({
                   <option value="separate">別途請求</option>
                 </Select>
               </Field>
-              <Field label={`年次点検費（${feeLabel}・円）`} required={annualFeeHandling === "separate"}>
-                <Input
-                  name="annualInspectionFee"
-                  type="number"
-                  step="1"
-                  min="0"
-                  inputMode="numeric"
-                  value={annualInspectionFee}
-                  onChange={(e) => setAnnualInspectionFee(e.target.value)}
-                  disabled={annualFeeHandling !== "separate"}
-                />
+
+              <Field
+                label="年次点検費（円）"
+                required={annualFeeHandling === "separate"}
+                hint={
+                  annualFeeHandling !== "separate"
+                    ? undefined
+                    : annualFeeTaxMode === "included"
+                      ? `税抜 ${formatYen(preview.pricing.annualInspectionFeeExcl)}`
+                      : `税込 ${formatYen(preview.pricing.annualInspectionFeeIncl)}`
+                }
+              >
+                <div className="flex gap-2">
+                  <Input
+                    name="annualInspectionFee"
+                    type="number"
+                    step="1"
+                    min="0"
+                    inputMode="numeric"
+                    value={annualInspectionFee}
+                    onChange={(e) => setAnnualInspectionFee(e.target.value)}
+                    disabled={annualFeeHandling !== "separate"}
+                  />
+                  <Select
+                    className="w-24 shrink-0"
+                    aria-label="年次点検費が税抜か税込か"
+                    value={annualFeeTaxMode}
+                    onChange={(e) =>
+                      setAnnualFeeTaxMode(e.target.value as "excluded" | "included")
+                    }
+                    disabled={annualFeeHandling !== "separate"}
+                  >
+                    <option value="excluded">税抜</option>
+                    <option value="included">税込</option>
+                  </Select>
+                </div>
                 {err("annualInspectionFee")}
               </Field>
               <Field label="点数単価（円/点・税抜）" hint="未チェックのときは 年額税抜 ÷（点数×12）で自動計算します">

@@ -5,12 +5,14 @@ export type AnnualFeeHandling = "included" | "separate";
 export type FeeTaxMode = "excluded" | "included";
 
 export type PricingInput = {
-  /** 月額。税抜か税込かは feeTaxMode で決まる */
+  /** 月額。税抜か税込かは monthlyFeeTaxMode で決まる */
   monthlyFee: number;
-  feeTaxMode?: FeeTaxMode;
+  monthlyFeeTaxMode?: FeeTaxMode;
   annualFeeHandling: AnnualFeeHandling;
-  /** 年次点検費。separate のときのみ加算する。税抜／税込は feeTaxMode に従う */
+  /** 年次点検費。separate のときのみ加算する */
   annualInspectionFee?: number | null;
+  /** 年次点検費を税抜で入れたか税込で入れたか。月額とは別に選べる */
+  annualFeeTaxMode?: FeeTaxMode;
   taxRate: number;
   /** 保安管理点数。0 または null のとき点数単価は null */
   points: number | null;
@@ -46,13 +48,21 @@ function expand(amount: number, mode: FeeTaxMode, taxFactor: number) {
 /** 料金と点数単価 */
 export function calcPricing(input: PricingInput): PricingResult {
   const taxFactor = 1 + input.taxRate;
-  const mode = input.feeTaxMode ?? "excluded";
 
-  const monthly = expand(input.monthlyFee, mode, taxFactor);
+  // 月額と年次点検費は、契約によって税抜・税込がそろっていないことがある
+  const monthly = expand(
+    input.monthlyFee,
+    input.monthlyFeeTaxMode ?? "excluded",
+    taxFactor,
+  );
 
   const rawAnnualFee =
     input.annualFeeHandling === "separate" ? (input.annualInspectionFee ?? 0) : 0;
-  const annualFee = expand(rawAnnualFee, mode, taxFactor);
+  const annualFee = expand(
+    rawAnnualFee,
+    input.annualFeeTaxMode ?? "excluded",
+    taxFactor,
+  );
 
   // 年額は月額12回分と年次点検費の合計。請求する額をそのまま積み上げる
   const annualExcl = monthly.excl * 12 + annualFee.excl;

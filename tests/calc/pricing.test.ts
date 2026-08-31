@@ -93,7 +93,7 @@ describe("税込で入力した場合", () => {
   it("入力した税込額はそのまま使い、税抜を割り戻す", () => {
     const r = calcPricing({
       monthlyFee: 19250, // 税込で入力
-      feeTaxMode: "included",
+      monthlyFeeTaxMode: "included",
       annualFeeHandling: "included",
       taxRate: TAX,
       points: 0.48,
@@ -109,7 +109,8 @@ describe("税込で入力した場合", () => {
   it("税抜で入れても税込で入れても、同じ契約なら同じ結果になる", () => {
     const excluded = calcPricing({
       monthlyFee: 14000,
-      feeTaxMode: "excluded",
+      monthlyFeeTaxMode: "excluded",
+      annualFeeTaxMode: "excluded",
       annualFeeHandling: "separate",
       annualInspectionFee: 40000,
       taxRate: TAX,
@@ -117,7 +118,8 @@ describe("税込で入力した場合", () => {
     });
     const included = calcPricing({
       monthlyFee: 15400,
-      feeTaxMode: "included",
+      monthlyFeeTaxMode: "included",
+      annualFeeTaxMode: "included",
       annualFeeHandling: "separate",
       annualInspectionFee: 44000,
       taxRate: TAX,
@@ -134,7 +136,8 @@ describe("税込で入力した場合", () => {
   it("年次点検費も税込で扱う", () => {
     const r = calcPricing({
       monthlyFee: 15400,
-      feeTaxMode: "included",
+      monthlyFeeTaxMode: "included",
+      annualFeeTaxMode: "included",
       annualFeeHandling: "separate",
       annualInspectionFee: 44000,
       taxRate: TAX,
@@ -160,7 +163,7 @@ describe("点数単価は常に税抜で求める", () => {
   it("税込入力でも税抜の年額を基準にする", () => {
     const r = calcPricing({
       monthlyFee: 22000, // 税込
-      feeTaxMode: "included",
+      monthlyFeeTaxMode: "included",
       annualFeeHandling: "included",
       taxRate: TAX,
       points: 1,
@@ -168,5 +171,46 @@ describe("点数単価は常に税抜で求める", () => {
     // 税抜年額 20,000 × 12 = 240,000 →  240,000 ÷ 12 = 20,000
     expect(r.monthlyExcl).toBe(20000);
     expect(r.unitPrice).toBe(20000);
+  });
+});
+
+describe("月額と年次点検費で税区分が違う契約", () => {
+  it("月額は税抜、年次点検費は税込で入力できる", () => {
+    const r = calcPricing({
+      monthlyFee: 16000, // 税抜
+      monthlyFeeTaxMode: "excluded",
+      annualFeeHandling: "separate",
+      annualInspectionFee: 44000, // 税込
+      annualFeeTaxMode: "included",
+      taxRate: TAX,
+      points: 0.36,
+    });
+
+    expect(r.monthlyExcl).toBe(16000);
+    expect(r.monthlyIncl).toBe(17600);
+    expect(r.annualInspectionFeeIncl).toBe(44000);
+    expect(r.annualInspectionFeeExcl).toBe(40000);
+
+    // 年額は それぞれの税抜／税込を積み上げる
+    expect(r.annualExcl).toBe(16000 * 12 + 40000);
+    expect(r.annualIncl).toBe(17600 * 12 + 44000);
+  });
+
+  it("月額は税込、年次点検費は税抜でも計算できる", () => {
+    const r = calcPricing({
+      monthlyFee: 17600, // 税込
+      monthlyFeeTaxMode: "included",
+      annualFeeHandling: "separate",
+      annualInspectionFee: 40000, // 税抜
+      annualFeeTaxMode: "excluded",
+      taxRate: TAX,
+      points: 0.36,
+    });
+
+    expect(r.monthlyIncl).toBe(17600);
+    expect(r.monthlyExcl).toBe(16000);
+    expect(r.annualInspectionFeeExcl).toBe(40000);
+    expect(r.annualInspectionFeeIncl).toBe(44000);
+    expect(r.annualExcl).toBe(232000);
   });
 });

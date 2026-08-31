@@ -152,8 +152,15 @@ export function parseDocument(raw: unknown): AppDocument {
     // 項目を後から増やしているので、古いデータには既定値を補う
     customers: (list("customers") as AppDocument["customers"]).map((c) => ({
       ...c,
-      // 以前のデータは税抜で入力されている前提
-      feeTaxMode: c.feeTaxMode ?? "excluded",
+      // 以前は月額と年次点検費でひとつの設定だった。無ければ税抜として扱う
+      monthlyFeeTaxMode:
+        c.monthlyFeeTaxMode ??
+        (c as { feeTaxMode?: "excluded" | "included" }).feeTaxMode ??
+        "excluded",
+      annualFeeTaxMode:
+        c.annualFeeTaxMode ??
+        (c as { feeTaxMode?: "excluded" | "included" }).feeTaxMode ??
+        "excluded",
       annualAvailability: c.annualAvailability ?? "unspecified",
       annualAvailabilityNote: c.annualAvailabilityNote ?? "",
       priorContactRequired: c.priorContactRequired ?? 0,

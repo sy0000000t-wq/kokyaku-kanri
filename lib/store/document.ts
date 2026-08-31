@@ -102,10 +102,12 @@ export type Customer = {
   name: string;
   inspectionCycleId: number;
   monthlyFee: number;
-  /** monthlyFee と annualInspectionFee を税抜で入れたか税込で入れたか */
-  feeTaxMode: FeeTaxMode;
+  /** 月額を税抜で入れたか税込で入れたか */
+  monthlyFeeTaxMode: FeeTaxMode;
   annualFeeHandling: AnnualFeeHandling;
   annualInspectionFee: number | null;
+  /** 年次点検費を税抜で入れたか税込で入れたか */
+  annualFeeTaxMode: FeeTaxMode;
   unitPriceOverride: number | null;
   address: string;
   lat: number | null;

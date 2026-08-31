@@ -42,9 +42,10 @@ export type CustomerInput = {
   name: string;
   inspectionCycleId: number;
   monthlyFee: number;
-  feeTaxMode: "excluded" | "included";
+  monthlyFeeTaxMode: "excluded" | "included";
   annualFeeHandling: "included" | "separate";
   annualInspectionFee: number | null;
+  annualFeeTaxMode: "excluded" | "included";
   unitPriceOverride: number | null;
   address: string;
   lat: number | null;
@@ -90,9 +91,10 @@ export function saveCustomer(
     name: input.name,
     inspectionCycleId: input.inspectionCycleId,
     monthlyFee: input.monthlyFee,
-    feeTaxMode: input.feeTaxMode,
+    monthlyFeeTaxMode: input.monthlyFeeTaxMode,
     annualFeeHandling: input.annualFeeHandling,
     annualInspectionFee: input.annualInspectionFee,
+    annualFeeTaxMode: input.annualFeeTaxMode,
     unitPriceOverride: input.unitPriceOverride,
     address: input.address,
     lat: dropCoords ? null : input.lat,

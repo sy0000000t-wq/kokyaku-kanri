@@ -159,9 +159,10 @@ export function buildCustomerView(
 
   const pricing = calcPricing({
     monthlyFee: customer.monthlyFee,
-    feeTaxMode: customer.feeTaxMode,
+    monthlyFeeTaxMode: customer.monthlyFeeTaxMode,
     annualFeeHandling: customer.annualFeeHandling,
     annualInspectionFee: customer.annualInspectionFee,
+    annualFeeTaxMode: customer.annualFeeTaxMode,
     taxRate: doc.settings.taxRate,
     points: site.total,
     unitPriceOverride: customer.unitPriceOverride,
