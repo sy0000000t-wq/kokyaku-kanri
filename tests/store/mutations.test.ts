@@ -39,6 +39,7 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
     name: "テスト事業場",
     inspectionCycleId: doc.inspectionCycles[1].id,
     monthlyFee: 17500,
+    feeTaxMode: "excluded" as const,
     annualFeeHandling: "included",
     annualInspectionFee: null,
     unitPriceOverride: null,

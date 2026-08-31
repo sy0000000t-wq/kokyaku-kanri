@@ -88,3 +88,85 @@ describe("calcPricing その他", () => {
     expect(r.annualIncl).toBe(226800);
   });
 });
+
+describe("税込で入力した場合", () => {
+  it("入力した税込額はそのまま使い、税抜を割り戻す", () => {
+    const r = calcPricing({
+      monthlyFee: 19250, // 税込で入力
+      feeTaxMode: "included",
+      annualFeeHandling: "included",
+      taxRate: TAX,
+      points: 0.48,
+    });
+    expect(r.monthlyIncl).toBe(19250);
+    expect(r.monthlyExcl).toBe(17500);
+    expect(r.annualIncl).toBe(231000);
+    expect(r.annualExcl).toBe(210000);
+    // 点数単価は税抜の年額から求める
+    expect(r.unitPrice).toBe(36458);
+  });
+
+  it("税抜で入れても税込で入れても、同じ契約なら同じ結果になる", () => {
+    const excluded = calcPricing({
+      monthlyFee: 14000,
+      feeTaxMode: "excluded",
+      annualFeeHandling: "separate",
+      annualInspectionFee: 40000,
+      taxRate: TAX,
+      points: 0.6,
+    });
+    const included = calcPricing({
+      monthlyFee: 15400,
+      feeTaxMode: "included",
+      annualFeeHandling: "separate",
+      annualInspectionFee: 44000,
+      taxRate: TAX,
+      points: 0.6,
+    });
+
+    expect(included.monthlyExcl).toBe(excluded.monthlyExcl);
+    expect(included.annualExcl).toBe(excluded.annualExcl);
+    expect(included.annualIncl).toBe(excluded.annualIncl);
+    expect(included.unitPrice).toBe(excluded.unitPrice);
+    expect(included.unitPrice).toBe(28889);
+  });
+
+  it("年次点検費も税込で扱う", () => {
+    const r = calcPricing({
+      monthlyFee: 15400,
+      feeTaxMode: "included",
+      annualFeeHandling: "separate",
+      annualInspectionFee: 44000,
+      taxRate: TAX,
+      points: 0.6,
+    });
+    expect(r.annualInspectionFeeIncl).toBe(44000);
+    expect(r.annualInspectionFeeExcl).toBe(40000);
+  });
+
+  it("指定が無ければ従来どおり税抜として扱う", () => {
+    const r = calcPricing({
+      monthlyFee: 17500,
+      annualFeeHandling: "included",
+      taxRate: TAX,
+      points: 0.48,
+    });
+    expect(r.monthlyExcl).toBe(17500);
+    expect(r.monthlyIncl).toBe(19250);
+  });
+});
+
+describe("点数単価は常に税抜で求める", () => {
+  it("税込入力でも税抜の年額を基準にする", () => {
+    const r = calcPricing({
+      monthlyFee: 22000, // 税込
+      feeTaxMode: "included",
+      annualFeeHandling: "included",
+      taxRate: TAX,
+      points: 1,
+    });
+    // 税抜年額 20,000 × 12 = 240,000 →  240,000 ÷ 12 = 20,000
+    expect(r.monthlyExcl).toBe(20000);
+    expect(r.unitPrice).toBe(20000);
+  });
+});

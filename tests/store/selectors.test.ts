@@ -21,6 +21,7 @@ function customer(overrides: Partial<Customer> = {}): Customer {
     name: "テスト事業場",
     inspectionCycleId: 2,
     monthlyFee: 17500,
+    feeTaxMode: "excluded" as const,
     annualFeeHandling: "included",
     annualInspectionFee: null,
     unitPriceOverride: null,

@@ -14,6 +14,7 @@ export function CustomerCsvButton({ rows }: { rows: CustomerView[] }) {
         "物件名称",
         "設備",
         "保安管理点数",
+        "入力した金額",
         "月額(税抜)",
         "月額(税込)",
         "年次点検費の扱い",
@@ -50,6 +51,7 @@ export function CustomerCsvButton({ rows }: { rows: CustomerView[] }) {
           )
           .join("\n"),
         c.points ?? "",
+        c.feeTaxMode === "included" ? "税込" : "税抜",
         c.pricing.monthlyExcl,
         c.pricing.monthlyIncl,
         c.annualFeeHandling === "separate" ? "別途請求" : "月額に含む",

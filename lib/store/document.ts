@@ -13,6 +13,8 @@ export type CapacityUnit = "kVA" | "kW" | "none";
 export type CalculationMethod = "table" | "fixed";
 export type CategoryGroup = "demand" | "generation" | "other";
 export type AnnualFeeHandling = "included" | "separate";
+/** 入力した金額が税抜か税込か */
+export type FeeTaxMode = "excluded" | "included";
 export type DistanceMethod = "road" | "straight";
 /** 年次点検を実施できる曜日の区分 */
 export type AnnualAvailability = "unspecified" | "weekday" | "holiday" | "any";
@@ -100,6 +102,8 @@ export type Customer = {
   name: string;
   inspectionCycleId: number;
   monthlyFee: number;
+  /** monthlyFee と annualInspectionFee を税抜で入れたか税込で入れたか */
+  feeTaxMode: FeeTaxMode;
   annualFeeHandling: AnnualFeeHandling;
   annualInspectionFee: number | null;
   unitPriceOverride: number | null;

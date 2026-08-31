@@ -48,6 +48,8 @@ export function CustomerForm({
   );
   const [inspectionCycleId, setInspectionCycleId] = useState(initial.inspectionCycleId);
   const [monthlyFee, setMonthlyFee] = useState(initial.monthlyFee.toString());
+  // 契約書どおりの金額を入れられるよう、税抜／税込を選べるようにする
+  const [feeTaxMode, setFeeTaxMode] = useState(initial.feeTaxMode);
   const [annualFeeHandling, setAnnualFeeHandling] = useState(initial.annualFeeHandling);
   const [annualInspectionFee, setAnnualInspectionFee] = useState(
     initial.annualInspectionFee?.toString() ?? "",
@@ -103,6 +105,7 @@ export function CustomerForm({
   const [recalcPending, startRecalc] = useTransition();
 
   const cycle = masters.inspectionCycles.find((c) => c.id === inspectionCycleId);
+  const feeLabel = feeTaxMode === "included" ? "税込" : "税抜";
 
   // 設備ごとに点数を出して合算する（換算値算出フロー図 参考例1・2）
   const preview = useMemo(() => {
@@ -116,6 +119,7 @@ export function CustomerForm({
 
     const pricing = calcPricing({
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
+      feeTaxMode,
       annualFeeHandling,
       annualInspectionFee: annualInspectionFee === "" ? null : Number(annualInspectionFee),
       taxRate: masters.taxRate,
@@ -128,6 +132,7 @@ export function CustomerForm({
   }, [
     facilities,
     monthlyFee,
+    feeTaxMode,
     annualFeeHandling,
     annualInspectionFee,
     useUnitPriceOverride,
@@ -160,6 +165,7 @@ export function CustomerForm({
       name: fields.name.trim(),
       inspectionCycleId,
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
+      feeTaxMode,
       annualFeeHandling,
       annualInspectionFee:
         annualFeeHandling === "separate" ? toNum(annualInspectionFee) : null,
@@ -320,9 +326,29 @@ export function CustomerForm({
 
           {/* 3. 料金情報 */}
           <Card>
-            <CardHeader title="料金情報" />
+            <CardHeader
+              title="料金情報"
+              description="契約書に書かれている金額をそのまま入力できます"
+            />
             <div className="grid gap-3 p-4 sm:grid-cols-2">
-              <Field label="月額（税抜・円）" required>
+              <Field
+                label="入力する金額"
+                required
+                className="sm:col-span-2"
+                hint="下の月額と年次点検費を、どちらで入力するかを選びます。もう一方は自動で計算します"
+              >
+                <Select
+                  value={feeTaxMode}
+                  onChange={(e) =>
+                    setFeeTaxMode(e.target.value as "excluded" | "included")
+                  }
+                >
+                  <option value="excluded">税抜で入力する</option>
+                  <option value="included">税込で入力する</option>
+                </Select>
+              </Field>
+
+              <Field label={`月額（${feeLabel}・円）`} required>
                 <Input
                   name="monthlyFee"
                   type="number"
@@ -346,7 +372,7 @@ export function CustomerForm({
                   <option value="separate">別途請求</option>
                 </Select>
               </Field>
-              <Field label="年次点検費（税抜・円）" required={annualFeeHandling === "separate"}>
+              <Field label={`年次点検費（${feeLabel}・円）`} required={annualFeeHandling === "separate"}>
                 <Input
                   name="annualInspectionFee"
                   type="number"
@@ -359,7 +385,7 @@ export function CustomerForm({
                 />
                 {err("annualInspectionFee")}
               </Field>
-              <Field label="点数単価（円/点）" hint="未チェックのときは年額税抜 ÷（点数×12）">
+              <Field label="点数単価（円/点・税抜）" hint="未チェックのときは 年額税抜 ÷（点数×12）で自動計算します">
                 <div className="flex items-center gap-2">
                   <label className="flex items-center gap-1.5 text-xs whitespace-nowrap">
                     <input
