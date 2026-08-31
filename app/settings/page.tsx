@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { BasicSettings } from "@/components/settings/basic-settings";
 import { CategoryEditor } from "@/components/settings/category-editor";
 import { CoefficientEditor } from "@/components/settings/coefficient-editor";
+import { FocusEditor } from "@/components/settings/focus-editor";
 import { DataManagement } from "@/components/settings/data-management";
 import {
   BillingCycleEditor,
@@ -22,6 +23,7 @@ const TABS = [
   { id: "cycle", label: "訪問周期" },
   { id: "billing", label: "請求サイクル" },
   { id: "coefficient", label: "換算係数" },
+  { id: "focus", label: "重点実施項目" },
   { id: "data", label: "データ管理" },
 ] as const;
 
@@ -80,6 +82,7 @@ function SettingsPageInner() {
           rowsByTable={rowsByTable}
         />
       )}
+      {tab === "focus" && <FocusEditor />}
       {tab === "data" && <DataManagement />}
     </div>
   );

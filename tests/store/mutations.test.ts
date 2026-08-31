@@ -13,8 +13,12 @@ import {
   setCustomerActive,
   setInspectionDone,
   setInspectionNote,
-  setMonthlyNote,
-  getMonthlyNote,
+  setMonthlyFocus,
+  getMonthlyFocus,
+  saveAnnualFocus,
+  deleteAnnualFocus,
+  isAnnualFocusDue,
+  getAnnualFocusForYear,
   setPaid,
   updateDistance,
   type CustomerInput,
@@ -503,32 +507,91 @@ describe("覚書", () => {
     expect(cleared.inspectionRecords[0].note).toBeNull();
   });
 
-  it("月ごとの覚書を年月で持てる", () => {
+  it("月次の重点実施項目は毎年その月に巡ってくる", () => {
     const doc = createInitialDocument();
 
-    const august = setMonthlyNote(doc, { year: 2026, month: 8, note: "重点は温度測定" });
-    const both = setMonthlyNote(august, { year: 2026, month: 9, note: "重点は電流測定" });
+    const august = setMonthlyFocus(doc, { month: 8, note: "温度測定" });
+    const both = setMonthlyFocus(august, { month: 9, note: "電流測定" });
 
-    expect(getMonthlyNote(both, 2026, 8)).toBe("重点は温度測定");
-    expect(getMonthlyNote(both, 2026, 9)).toBe("重点は電流測定");
-    expect(getMonthlyNote(both, 2026, 10)).toBe("");
-    expect(both.monthlyNotes).toHaveLength(2);
+    expect(getMonthlyFocus(both, 8)).toBe("温度測定");
+    expect(getMonthlyFocus(both, 9)).toBe("電流測定");
+    expect(getMonthlyFocus(both, 10)).toBe("");
+    // 年は持たないので、どの年でも同じ内容が出る
+    expect(both.monthlyFocus).toEqual([
+      { month: 8, note: "温度測定" },
+      { month: 9, note: "電流測定" },
+    ]);
   });
 
-  it("同じ年月に書き直すと置き換わる", () => {
+  it("同じ月に書き直すと置き換わり、空にすると消える", () => {
     const doc = createInitialDocument();
-    const a = setMonthlyNote(doc, { year: 2026, month: 8, note: "温度測定" });
-    const b = setMonthlyNote(a, { year: 2026, month: 8, note: "温度測定と絶縁測定" });
+    const a = setMonthlyFocus(doc, { month: 8, note: "温度測定" });
+    const b = setMonthlyFocus(a, { month: 8, note: "温度測定と絶縁測定" });
+    expect(b.monthlyFocus).toHaveLength(1);
+    expect(getMonthlyFocus(b, 8)).toBe("温度測定と絶縁測定");
 
-    expect(b.monthlyNotes).toHaveLength(1);
-    expect(getMonthlyNote(b, 2026, 8)).toBe("温度測定と絶縁測定");
+    const c = setMonthlyFocus(b, { month: 8, note: "  " });
+    expect(c.monthlyFocus).toHaveLength(0);
   });
 
-  it("空にすると月ごとの覚書も消える", () => {
+  it("年次点検の重点実施項目は指定年ごとに巡ってくる", () => {
     const doc = createInitialDocument();
-    const a = setMonthlyNote(doc, { year: 2026, month: 8, note: "温度測定" });
-    const b = setMonthlyNote(a, { year: 2026, month: 8, note: "" });
+    const withItem = saveAnnualFocus(doc, {
+      id: null,
+      title: "絶縁耐力試験",
+      intervalYears: 3,
+      baseYear: 2026,
+      note: "",
+    });
+    const item = withItem.annualFocus[0];
 
-    expect(b.monthlyNotes).toHaveLength(0);
+    expect(isAnnualFocusDue(item, 2026)).toBe(true);
+    expect(isAnnualFocusDue(item, 2027)).toBe(false);
+    expect(isAnnualFocusDue(item, 2028)).toBe(false);
+    expect(isAnnualFocusDue(item, 2029)).toBe(true);
+    expect(isAnnualFocusDue(item, 2032)).toBe(true);
+    // 起点より前は対象外
+    expect(isAnnualFocusDue(item, 2025)).toBe(false);
+  });
+
+  it("毎年の項目は毎年該当する", () => {
+    const doc = createInitialDocument();
+    const withItem = saveAnnualFocus(doc, {
+      id: null,
+      title: "接地抵抗測定",
+      intervalYears: 1,
+      baseYear: 2026,
+      note: "",
+    });
+    const item = withItem.annualFocus[0];
+    expect(isAnnualFocusDue(item, 2026)).toBe(true);
+    expect(isAnnualFocusDue(item, 2027)).toBe(true);
+  });
+
+  it("その年に該当する項目だけ取り出せる", () => {
+    let doc = createInitialDocument();
+    doc = saveAnnualFocus(doc, {
+      id: null, title: "毎年やること", intervalYears: 1, baseYear: 2026, note: "",
+    });
+    doc = saveAnnualFocus(doc, {
+      id: null, title: "3年ごと", intervalYears: 3, baseYear: 2026, note: "",
+    });
+
+    expect(getAnnualFocusForYear(doc, 2026).map((a) => a.title)).toEqual([
+      "毎年やること",
+      "3年ごと",
+    ]);
+    expect(getAnnualFocusForYear(doc, 2027).map((a) => a.title)).toEqual([
+      "毎年やること",
+    ]);
+  });
+
+  it("年次点検の項目を消せる", () => {
+    const doc = createInitialDocument();
+    const withItem = saveAnnualFocus(doc, {
+      id: null, title: "消す項目", intervalYears: 2, baseYear: 2026, note: "",
+    });
+    const removed = deleteAnnualFocus(withItem, withItem.annualFocus[0].id);
+    expect(removed.annualFocus).toHaveLength(0);
   });
 });

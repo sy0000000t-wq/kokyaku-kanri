@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { InspectionCheck } from "@/components/schedule/inspection-check";
 import { InspectionNote } from "@/components/schedule/inspection-note";
-import { MonthlyNote } from "@/components/schedule/monthly-note";
+import { FocusItems } from "@/components/schedule/focus-items";
 import { PeriodNav } from "@/components/period-nav";
 import { ScopeFilter } from "@/components/scope-filter";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
@@ -223,7 +223,11 @@ function SchedulePageInner() {
         </Card>
       </div>
 
-      <MonthlyNote year={period.year} month={period.month} />
+      <FocusItems
+        year={period.year}
+        month={period.month}
+        hasAnnualTarget={annualCount > 0}
+      />
 
       {/* 当月リスト（モバイル主用途） */}
       <Card>

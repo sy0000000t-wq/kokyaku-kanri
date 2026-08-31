@@ -355,31 +355,80 @@ export function setInspectionNote(
   return touch({ ...doc, inspectionRecords: records });
 }
 
-/** 月ごとの覚書（その月の重点実施項目など） */
-export function setMonthlyNote(
+/**
+ * 月次の重点実施項目。毎年その月に巡ってくる（例：毎年8月は温度測定）。
+ * 空にすると消える。
+ */
+export function setMonthlyFocus(
   doc: AppDocument,
-  input: { year: number; month: number; note: string },
+  input: { month: number; note: string },
 ): AppDocument {
-  const others = doc.monthlyNotes.filter(
-    (n) => !(n.year === input.year && n.month === input.month),
-  );
+  const others = doc.monthlyFocus.filter((n) => n.month !== input.month);
   const note = input.note.trim();
 
   return touch({
     ...doc,
-    monthlyNotes: note === "" ? others : [...others, { ...input, note }],
+    monthlyFocus:
+      note === "" ? others : [...others, { month: input.month, note }],
   });
 }
 
-/** 指定年月の覚書を取り出す */
-export function getMonthlyNote(
+export function getMonthlyFocus(doc: AppDocument, month: number): string {
+  return doc.monthlyFocus.find((n) => n.month === month)?.note ?? "";
+}
+
+/** 年次点検の重点実施項目を追加・更新する */
+export function saveAnnualFocus(
   doc: AppDocument,
+  input: {
+    id: number | null;
+    title: string;
+    intervalYears: number;
+    baseYear: number;
+    note: string;
+  },
+): AppDocument {
+  const values = {
+    title: input.title.trim(),
+    intervalYears: Math.max(1, Math.round(input.intervalYears || 1)),
+    baseYear: input.baseYear,
+    note: input.note,
+  };
+
+  if (input.id) {
+    return touch({
+      ...doc,
+      annualFocus: doc.annualFocus.map((a) =>
+        a.id === input.id ? { ...a, ...values } : a,
+      ),
+    });
+  }
+  return touch({
+    ...doc,
+    annualFocus: [...doc.annualFocus, { id: nextId(doc.annualFocus), ...values }],
+  });
+}
+
+export function deleteAnnualFocus(doc: AppDocument, id: number): AppDocument {
+  return touch({ ...doc, annualFocus: doc.annualFocus.filter((a) => a.id !== id) });
+}
+
+/**
+ * その年に巡ってくる年次点検の重点実施項目かどうか。
+ * 起点の年と、そこから intervalYears ごとの年が対象。
+ */
+export function isAnnualFocusDue(
+  item: { intervalYears: number; baseYear: number },
   year: number,
-  month: number,
-): string {
-  return (
-    doc.monthlyNotes.find((n) => n.year === year && n.month === month)?.note ?? ""
-  );
+): boolean {
+  const interval = Math.max(1, Math.round(item.intervalYears || 1));
+  if (year < item.baseYear) return false;
+  return (year - item.baseYear) % interval === 0;
+}
+
+/** その年に該当する年次点検の重点実施項目 */
+export function getAnnualFocusForYear(doc: AppDocument, year: number) {
+  return doc.annualFocus.filter((a) => isAnnualFocusDue(a, year));
 }
 
 /* ------------------------------- 請求・入金実績 ------------------------------- */

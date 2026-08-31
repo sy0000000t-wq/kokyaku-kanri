@@ -111,7 +111,8 @@ export function createInitialDocument(): AppDocument {
     customerInspectionMonths: [],
     inspectionRecords: [],
     billingRecords: [],
-    monthlyNotes: [],
+    monthlyFocus: [],
+    annualFocus: [],
   };
 }
 
@@ -171,6 +172,12 @@ export function parseDocument(raw: unknown): AppDocument {
     customerInspectionMonths: list("customerInspectionMonths"),
     inspectionRecords: list("inspectionRecords"),
     billingRecords: list("billingRecords"),
-    monthlyNotes: list("monthlyNotes"),
+    // 以前は年月ごとの覚書だった。月次の重点実施項目として引き継ぐ
+    monthlyFocus: Array.isArray(d.monthlyFocus)
+      ? (d.monthlyFocus as AppDocument["monthlyFocus"])
+      : ((d.monthlyNotes as { month: number; note: string }[] | undefined) ?? [])
+          .filter((n) => n && n.note)
+          .map((n) => ({ month: n.month, note: n.note })),
+    annualFocus: list("annualFocus"),
   };
 }

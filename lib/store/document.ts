@@ -181,10 +181,26 @@ export type BillingRecord = {
   note: string | null;
 };
 
-/** 月ごとの覚書。その月の重点実施項目など */
-export type MonthlyNote = {
-  year: number;
+/**
+ * 月次の重点実施項目。毎年その月に巡ってくる（例：毎年8月は温度測定）。
+ * 年をまたいでも同じ内容が出る。
+ */
+export type MonthlyFocus = {
   month: number;
+  note: string;
+};
+
+/**
+ * 年次点検の重点実施項目。数年ごとに巡ってくる（例：3年ごとに絶縁耐力試験）。
+ * baseYear を起点に intervalYears ごとの年が対象になる。
+ */
+export type AnnualFocus = {
+  id: number;
+  title: string;
+  /** 1 なら毎年、3 なら3年ごと */
+  intervalYears: number;
+  /** 起点の年。この年と、以後 intervalYears ごとの年が対象 */
+  baseYear: number;
   note: string;
 };
 
@@ -204,7 +220,8 @@ export type AppDocument = {
   customerInspectionMonths: CustomerInspectionMonth[];
   inspectionRecords: InspectionRecord[];
   billingRecords: BillingRecord[];
-  monthlyNotes: MonthlyNote[];
+  monthlyFocus: MonthlyFocus[];
+  annualFocus: AnnualFocus[];
 };
 
 /** 採番。DB のオートインクリメントの代わり */
