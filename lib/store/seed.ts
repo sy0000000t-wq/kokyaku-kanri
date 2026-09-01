@@ -168,7 +168,10 @@ export function parseDocument(raw: unknown): AppDocument {
       priorContactRequired: c.priorContactRequired ?? 0,
       priorContactNote: c.priorContactNote ?? "",
     })),
-    customerFacilities: list("customerFacilities"),
+    // 設備ごとの点検開始月は後から足したので、無ければ顧客に合わせる（null）
+    customerFacilities: (list("customerFacilities") as AppDocument["customerFacilities"]).map(
+      (f) => ({ ...f, startMonth: f.startMonth ?? null }),
+    ),
     customerInspectionMonths: list("customerInspectionMonths"),
     inspectionRecords: list("inspectionRecords"),
     billingRecords: list("billingRecords"),

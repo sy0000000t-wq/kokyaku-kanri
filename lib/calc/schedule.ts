@@ -49,6 +49,41 @@ export function generateCycleMonths(
   return [...months].sort((a, b) => a - b);
 }
 
+/**
+ * 設備の点検を始める月を決める。
+ * 明示指定があればそれを使い、無ければ契約開始月以降で最初に訪問する月に合わせる。
+ * 訪問月が未設定なら契約開始月そのもの。
+ */
+export function resolveFacilityStartMonth(
+  explicit: number | null | undefined,
+  contractStartMonth: number,
+  inspectionMonths: number[],
+): number {
+  if (explicit != null && explicit >= 1 && explicit <= 12) return normalizeMonth(explicit);
+
+  const start = normalizeMonth(contractStartMonth);
+  if (inspectionMonths.length === 0) return start;
+
+  // 契約開始月から数えて最初に来る訪問月（見つからなければ契約開始月）
+  for (let i = 0; i < 12; i++) {
+    const m = normalizeMonth(start + i);
+    if (inspectionMonths.includes(m)) return m;
+  }
+  return start;
+}
+
+/**
+ * 設備の点検月のうち、現場に行かない月。
+ * 訪問と噛み合っていない設定を画面で知らせるために使う。
+ */
+export function monthsWithoutVisit(
+  facilityMonths: number[],
+  inspectionMonths: number[],
+): number[] {
+  if (inspectionMonths.length === 0) return [];
+  return facilityMonths.filter((m) => !inspectionMonths.includes(m));
+}
+
 export type ContractLike = {
   isActive: number | boolean;
   contractStartDate: string;

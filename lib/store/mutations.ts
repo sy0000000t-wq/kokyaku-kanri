@@ -33,6 +33,8 @@ export type FacilityInput = {
   categoryCycleId: number;
   capacity: number | null;
   coefficientOverride: number | null;
+  /** 点検開始月。null なら顧客の点検開始月に合わせる */
+  startMonth: number | null;
   note: string;
 };
 
@@ -137,6 +139,7 @@ export function saveCustomer(
       categoryCycleId: f.categoryCycleId,
       capacity: f.capacity,
       coefficientOverride: f.coefficientOverride,
+      startMonth: f.startMonth,
       note: f.note,
       sortOrder: i,
     };

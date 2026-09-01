@@ -5,7 +5,11 @@ import {
   type FacilityPointsResult,
 } from "@/lib/calc/coefficient";
 import { calcPricing, type PricingResult } from "@/lib/calc/pricing";
-import { generateCycleMonths, parseYearMonth } from "@/lib/calc/schedule";
+import {
+  generateCycleMonths,
+  parseYearMonth,
+  resolveFacilityStartMonth,
+} from "@/lib/calc/schedule";
 import { generateBillingMonths } from "@/lib/calc/billing";
 import type {
   AppDocument,
@@ -85,7 +89,8 @@ export type FacilityView = CustomerFacility & {
   cycle: CategoryCycle | null;
   result: FacilityPointsResult;
   /**
-   * この設備の点検を行う月。設備区分の周期から契約開始月起点で導出する。
+   * この設備の点検を行う月。設備の点検開始月（未指定なら顧客の点検開始月）を
+   * 起点に、設備区分の周期を足して導出する。
    * 訪問周期より長い設備（自家消費の太陽光＝6ヶ月に1回など）を、
    * どの訪問で実施するか示すために使う。
    */
@@ -139,6 +144,7 @@ export function buildCustomerView(
 
   const startMonthForFacilities =
     parseYearMonth(customer.contractStartDate)?.month ?? 1;
+  const customerInspectionMonths = indexes.inspectionMonthsByCustomer.get(customer.id) ?? [];
 
   const facilityViews: FacilityView[] = facilities.map((f, i) => {
     const cycle =
@@ -152,7 +158,11 @@ export function buildCustomerView(
       cycle,
       result: site.facilities[i],
       inspectionMonths: generateCycleMonths(
-        startMonthForFacilities,
+        resolveFacilityStartMonth(
+          f.startMonth,
+          startMonthForFacilities,
+          customerInspectionMonths,
+        ),
         cycle?.intervalMonths ?? 1,
       ),
     };
@@ -180,7 +190,7 @@ export function buildCustomerView(
     ...customer,
     inspectionCycle,
     billingCycle,
-    inspectionMonths: indexes.inspectionMonthsByCustomer.get(customer.id) ?? [],
+    inspectionMonths: customerInspectionMonths,
     billingMonths,
     facilities: facilityViews,
     points: site.total,

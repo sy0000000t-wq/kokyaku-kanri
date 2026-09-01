@@ -207,6 +207,7 @@ export function CustomerForm({
           f.coefficientMode === "auto" || f.coefficientOverride === ""
             ? null
             : Number(f.coefficientOverride),
+        startMonth: f.startMonth === "" ? null : Number(f.startMonth),
         note: f.note,
       })),
     };
@@ -293,6 +294,10 @@ export function CustomerForm({
               <FacilityRows
                 masters={masters}
                 facilities={facilities}
+                inspectionMonths={months}
+                contractStartMonth={
+                  parseYearMonth(contractStartDate)?.month ?? 1
+                }
                 onChange={(next) => {
                   setFacilities(next);
                   setDirty(true);

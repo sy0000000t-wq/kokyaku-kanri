@@ -95,6 +95,7 @@ function EditCustomerPageInner() {
             capacity: f.capacity?.toString() ?? "",
             coefficientMode: f.coefficientOverride != null ? "manual" : "auto",
             coefficientOverride: f.coefficientOverride?.toString() ?? "",
+            startMonth: f.startMonth?.toString() ?? "",
             note: f.note,
           })),
         }}

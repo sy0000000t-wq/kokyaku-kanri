@@ -45,6 +45,8 @@ export type FacilityFormValue = {
   /** 換算係数の指定方法 */
   coefficientMode: "auto" | "select" | "manual";
   coefficientOverride: string;
+  /** この設備の点検開始月。"" なら顧客の点検開始月に合わせる */
+  startMonth: string;
   note: string;
 };
 
@@ -101,6 +103,7 @@ export function emptyFacility(masters: FormMasters): FacilityFormValue {
     capacity: "",
     coefficientMode: "auto",
     coefficientOverride: "",
+    startMonth: "",
     note: "",
   };
 }

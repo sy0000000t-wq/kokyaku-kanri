@@ -4,8 +4,10 @@ import {
   generateCycleMonths,
   getInspectionTarget,
   isActiveInMonth,
+  monthsWithoutVisit,
   normalizeMonth,
   parseYearMonth,
+  resolveFacilityStartMonth,
   scheduleSymbol,
 } from "@/lib/calc/schedule";
 
@@ -109,5 +111,44 @@ describe("getInspectionTarget / scheduleSymbol §4.4", () => {
     });
     // 翌年の1月は対象になる
     expect(getInspectionTarget(t01, { year: 2027, month: 1 }).regular).toBe(true);
+  });
+});
+
+describe("resolveFacilityStartMonth（設備ごとの点検開始月）", () => {
+  it("指定があればその月を使う", () => {
+    expect(resolveFacilityStartMonth(9, 7, [7, 9, 11, 1, 3, 5])).toBe(9);
+  });
+
+  it("未指定なら契約開始月以降で最初に訪問する月に合わせる", () => {
+    expect(resolveFacilityStartMonth(null, 7, [7, 9, 11, 1, 3, 5])).toBe(7);
+    // 契約開始が8月でも、実際に行くのは9月
+    expect(resolveFacilityStartMonth(null, 8, [7, 9, 11, 1, 3, 5])).toBe(9);
+    // 年をまたいで一周して探す
+    expect(resolveFacilityStartMonth(null, 12, [3, 6, 9])).toBe(3);
+  });
+
+  it("訪問月が未設定なら契約開始月をそのまま使う", () => {
+    expect(resolveFacilityStartMonth(null, 7, [])).toBe(7);
+  });
+
+  it("7月開始・隔月訪問で、太陽光は通常7・1月、9月に実施したなら9・3月", () => {
+    const visits = [7, 9, 11, 1, 3, 5];
+    expect(generateCycleMonths(resolveFacilityStartMonth(null, 7, visits), 6)).toEqual([
+      1, 7,
+    ]);
+    expect(generateCycleMonths(resolveFacilityStartMonth(9, 7, visits), 6)).toEqual([
+      3, 9,
+    ]);
+  });
+});
+
+describe("monthsWithoutVisit", () => {
+  it("訪問しない月だけを返す", () => {
+    // 隔月訪問（奇数月）に3ヶ月周期の設備を置くと、偶数月にはみ出す
+    expect(monthsWithoutVisit([7, 10, 1, 4], [7, 9, 11, 1, 3, 5])).toEqual([10, 4]);
+  });
+
+  it("訪問月が未設定なら判定しない", () => {
+    expect(monthsWithoutVisit([7, 1], [])).toEqual([]);
   });
 });

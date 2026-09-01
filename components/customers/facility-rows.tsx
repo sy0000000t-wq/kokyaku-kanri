@@ -2,6 +2,11 @@
 
 import { Badge, Button, Input, Select } from "@/components/ui";
 import { calcFacilityPoints } from "@/lib/calc/coefficient";
+import {
+  generateCycleMonths,
+  monthsWithoutVisit,
+  resolveFacilityStartMonth,
+} from "@/lib/calc/schedule";
 import type {
   FacilityFormValue,
   FormCategory,
@@ -60,10 +65,15 @@ export function facilityResult(row: FacilityFormValue, masters: FormMasters) {
 export function FacilityRows({
   masters,
   facilities,
+  inspectionMonths,
+  contractStartMonth,
   onChange,
 }: {
   masters: FormMasters;
   facilities: FacilityFormValue[];
+  /** 顧客の通常点検の実施月。設備の点検開始月はこの中から選ぶ */
+  inspectionMonths: number[];
+  contractStartMonth: number;
   onChange: (next: FacilityFormValue[]) => void;
 }) {
   const update = (uid: string, patch: Partial<FacilityFormValue>) =>
@@ -77,6 +87,7 @@ export function FacilityRows({
       categoryCycleId: category?.cycles[0]?.id ?? 0,
       coefficientMode: "auto",
       coefficientOverride: "",
+      startMonth: "",
       capacity: category?.capacityUnit === "none" ? "" : row.capacity,
     });
   };
@@ -90,6 +101,31 @@ export function FacilityRows({
         );
         const needsCapacity = category?.capacityUnit !== "none";
         const isTable = category?.calculationMethod === "table";
+
+        // 毎月の設備は訪問のたびに点検するので、開始月をずらす意味がない
+        const interval = cycle?.intervalMonths ?? 1;
+        const canShiftStart = interval > 1;
+        const defaultStart = resolveFacilityStartMonth(
+          null,
+          contractStartMonth,
+          inspectionMonths,
+        );
+        const startMonth = resolveFacilityStartMonth(
+          row.startMonth === "" ? null : Number(row.startMonth),
+          contractStartMonth,
+          inspectionMonths,
+        );
+        const facilityMonths = generateCycleMonths(startMonth, interval);
+        const offVisit = monthsWithoutVisit(facilityMonths, inspectionMonths);
+        // 訪問月から選ぶ。訪問月が未設定なら 1〜12 月から選ぶ
+        const startOptions = [
+          ...new Set(
+            (inspectionMonths.length > 0
+              ? inspectionMonths
+              : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+            ).concat(row.startMonth === "" ? [] : [Number(row.startMonth)]),
+          ),
+        ].sort((a, b) => a - b);
 
         return (
           <div
@@ -195,6 +231,52 @@ export function FacilityRows({
                   {cycle?.conditionNote && <Badge>{cycle.conditionNote}</Badge>}
                 </div>
               </div>
+
+              {canShiftStart && (
+                <div className="sm:col-span-2 rounded-md border border-line bg-surface p-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">
+                        点検開始月
+                      </label>
+                      <Select
+                        value={row.startMonth}
+                        onChange={(e) =>
+                          update(row.uid, { startMonth: e.target.value })
+                        }
+                        aria-label={`設備 ${index + 1} の点検開始月`}
+                      >
+                        <option value="">
+                          点検開始月に合わせる（{defaultStart}月）
+                        </option>
+                        {startOptions.map((m) => (
+                          <option key={m} value={m}>
+                            {m}月から
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs text-muted">
+                        この設備の点検月
+                      </label>
+                      <p className="tabular flex h-9 items-center text-sm font-medium">
+                        {facilityMonths.length > 0
+                          ? `${facilityMonths.join("・")}月`
+                          : "実施なし"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    訪問より周期が長い設備の実施月をずらせます。例）隔月訪問で6ヶ月周期の太陽光を9月に実施したなら「9月から」で 9・3月になります
+                  </p>
+                  {offVisit.length > 0 && (
+                    <p className="mt-1 text-xs text-warn">
+                      {offVisit.join("・")}月は通常点検の実施月ではありません。実施月を見直すか、この設備の開始月を変えてください。
+                    </p>
+                  )}
+                </div>
+              )}
 
               {isTable && (
                 <>

@@ -76,6 +76,7 @@ function addFacility(
     categoryCycleId: cycle.id,
     capacity,
     coefficientOverride: null,
+    startMonth: null,
     note: "",
     sortOrder: doc.customerFacilities.filter((f) => f.customerId === customerId).length,
   });
@@ -249,5 +250,33 @@ describe("設備ごとの点検月", () => {
 
     const view = getCustomerViews(doc, buildIndexes(doc))[0];
     expect(view.facilities[0].inspectionMonths).toHaveLength(12);
+  });
+});
+
+describe("設備ごとの点検開始月", () => {
+  /** 7月開始・隔月訪問（7・9・11・1・3・5月）に太陽光6ヶ月を1件置く */
+  function solarSite(startMonth: number | null) {
+    const doc = createInitialDocument();
+    doc.customers.push(customer({ contractStartDate: "2026-07-01" }));
+    addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 300);
+    addFacility(doc, 1, CATEGORY.solarSelf, "6ヶ月に1回", 80);
+    doc.customerFacilities[1].startMonth = startMonth;
+    for (const month of [7, 9, 11, 1, 3, 5]) {
+      doc.customerInspectionMonths.push({ customerId: 1, month });
+    }
+    return getCustomerViews(doc, buildIndexes(doc))[0];
+  }
+
+  it("未指定なら需要設備は7・9・11・1・3・5月、太陽光は7・1月", () => {
+    const view = solarSite(null);
+    expect(view.facilities[0].inspectionMonths).toEqual([1, 3, 5, 7, 9, 11]);
+    expect(view.facilities[1].inspectionMonths).toEqual([1, 7]);
+  });
+
+  it("太陽光を9月始まりにすると9・3月になる", () => {
+    const view = solarSite(9);
+    // 需要設備は変わらない
+    expect(view.facilities[0].inspectionMonths).toEqual([1, 3, 5, 7, 9, 11]);
+    expect(view.facilities[1].inspectionMonths).toEqual([3, 9]);
   });
 });

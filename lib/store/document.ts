@@ -146,6 +146,14 @@ export type CustomerFacility = {
   categoryCycleId: number;
   capacity: number | null;
   coefficientOverride: number | null;
+  /**
+   * この設備の点検を始める月（1〜12）。
+   * null なら顧客の点検開始月に合わせる。
+   * 訪問より周期が長い設備（6ヶ月に1回の太陽光など）を、
+   * どの訪問で実施するかずらしたいときに指定する。
+   * 例）7月開始・隔月訪問で、太陽光を9月に実施した → 9 を指定して 9・3月にする
+   */
+  startMonth: number | null;
   note: string;
   sortOrder: number;
 };

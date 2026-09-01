@@ -77,6 +77,7 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
         categoryCycleId,
         capacity: 210,
         coefficientOverride: null,
+        startMonth: null,
         note: "",
       },
     ],
@@ -121,6 +122,7 @@ describe("saveCustomer", () => {
           categoryCycleId: solar.categoryCycleId,
           capacity: 80,
           coefficientOverride: null,
+          startMonth: null,
           note: "",
         },
       ],
@@ -438,7 +440,14 @@ describe("validateCustomer", () => {
     const errors = validateCustomer(doc, {
       ...input(doc),
       facilities: [
-        { id: null, ...lowVoltage, capacity: null, coefficientOverride: null, note: "" },
+        {
+          id: null,
+          ...lowVoltage,
+          capacity: null,
+          coefficientOverride: null,
+          startMonth: null,
+          note: "",
+        },
       ],
     });
     expect(errors.facilities).toBeUndefined();
