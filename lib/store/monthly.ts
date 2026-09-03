@@ -23,6 +23,15 @@ export type InspectionCell = {
   isTarget: boolean;
   isDone: boolean;
   doneDate: string | null;
+  /** 報告書を提出したか。実施とは別に追う */
+  isReported: boolean;
+  reportedDate: string | null;
+  /** 中電PGへ開閉器操作を申し込んだか（年次点検でのみ使う） */
+  isSwitchgearRequested: boolean;
+  switchgearRequestedDate: string | null;
+  /** 年次点検の応援依頼（通常点検では使わない） */
+  needsHelper: boolean;
+  helperName: string;
   record: InspectionRecord | null;
   /**
    * この訪問で点検する設備。
@@ -91,6 +100,12 @@ export function buildInspectionGrid(doc: AppDocument, year: number) {
       isTarget: type === "regular" ? target.regular : target.annual,
       isDone: !!record?.isDone,
       doneDate: record?.doneDate ?? null,
+      isReported: !!record?.isReported,
+      reportedDate: record?.reportedDate ?? null,
+      isSwitchgearRequested: !!record?.isSwitchgearRequested,
+      switchgearRequestedDate: record?.switchgearRequestedDate ?? null,
+      needsHelper: !!record?.needsHelper,
+      helperName: record?.helperName ?? "",
       record,
       dueFacilities,
     };
@@ -206,11 +221,13 @@ export function summarizeMonth(
       cells: regular,
       total: regular.length,
       done: regular.filter((c) => c.isDone).length,
+      reported: regular.filter((c) => c.isReported).length,
     },
     annual: {
       cells: annual,
       total: annual.length,
       done: annual.filter((c) => c.isDone).length,
+      reported: annual.filter((c) => c.isReported).length,
     },
     billing: {
       cells: billing,

@@ -69,6 +69,9 @@ export function CustomerForm({
   const [priorContactRequired, setPriorContactRequired] = useState(
     initial.priorContactRequired === 1,
   );
+  const [switchgearRequestRequired, setSwitchgearRequestRequired] = useState(
+    initial.switchgearRequestRequired === 1,
+  );
   const [months, setMonths] = useState<number[]>(initial.inspectionMonths);
   const [dirty, setDirty] = useState(false);
   // 顧客IDは契約年月日から作る。手で書き換えたら以後は追随させない
@@ -90,6 +93,7 @@ export function CustomerForm({
     annualAvailability: initial.annualAvailability,
     annualAvailabilityNote: initial.annualAvailabilityNote,
     priorContactNote: initial.priorContactNote,
+    switchgearRequestNote: initial.switchgearRequestNote,
     billingCycleId: initial.billingCycleId?.toString() ?? "",
     paymentLagMonths: String(initial.paymentLagMonths),
   });
@@ -192,7 +196,9 @@ export function CustomerForm({
         fields.annualAvailability as CustomerInput["annualAvailability"],
       annualAvailabilityNote: fields.annualAvailabilityNote,
       priorContactRequired: priorContactRequired ? 1 : 0,
+      switchgearRequestRequired: switchgearRequestRequired ? 1 : 0,
       priorContactNote: fields.priorContactNote,
+      switchgearRequestNote: fields.switchgearRequestNote,
       billingCycleId: toNum(fields.billingCycleId),
       paymentLagMonths: toNum(fields.paymentLagMonths) ?? 1,
       isActive: isActive ? 1 : 0,
@@ -613,6 +619,30 @@ export function CustomerForm({
                 <Input
                   {...bind("priorContactNote")}
                   disabled={!priorContactRequired}
+                />
+              </Field>
+
+              <Field label="中電PGの開閉器操作申し込み">
+                <div className="flex h-9 items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={switchgearRequestRequired}
+                      onChange={(e) =>
+                        setSwitchgearRequestRequired(e.target.checked)
+                      }
+                    />
+                    年次点検に申し込みが必要
+                  </label>
+                </div>
+              </Field>
+              <Field
+                label="開閉器操作申し込みの補足"
+                hint="申込先の営業所や、何日前までに出すかなど"
+              >
+                <Input
+                  {...bind("switchgearRequestNote")}
+                  disabled={!switchgearRequestRequired}
                 />
               </Field>
 

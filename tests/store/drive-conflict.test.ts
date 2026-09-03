@@ -43,6 +43,8 @@ function docWith(names: string[]): AppDocument {
     annualInspectionMonth: null, annualInspectionDay: null,
     annualAvailability: "unspecified" as const, annualAvailabilityNote: "",
     priorContactRequired: 0, priorContactNote: "",
+ switchgearRequestRequired: 0,
+ switchgearRequestNote: "",
     billingCycleId: 1, paymentLagMonths: 1, isActive: 1, note: "",
     createdAt: "", updatedAt: "",
   }));

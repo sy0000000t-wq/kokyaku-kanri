@@ -82,6 +82,8 @@ function EditCustomerPageInner() {
           annualAvailabilityNote: customer.annualAvailabilityNote,
           priorContactRequired: customer.priorContactRequired,
           priorContactNote: customer.priorContactNote,
+          switchgearRequestRequired: customer.switchgearRequestRequired,
+          switchgearRequestNote: customer.switchgearRequestNote,
           billingCycleId: customer.billingCycleId,
           paymentLagMonths: customer.paymentLagMonths,
           isActive: customer.isActive,

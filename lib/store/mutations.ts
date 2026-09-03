@@ -11,6 +11,7 @@ import {
   type CustomerFacility,
   type EquipmentCategory,
   type InspectionCycle,
+  type InspectionRecord,
   type InspectionType,
   type Settings,
 } from "./document";
@@ -63,6 +64,8 @@ export type CustomerInput = {
   annualAvailabilityNote: string;
   priorContactRequired: number;
   priorContactNote: string;
+  switchgearRequestRequired: number;
+  switchgearRequestNote: string;
   billingCycleId: number | null;
   paymentLagMonths: number;
   isActive: number;
@@ -116,6 +119,8 @@ export function saveCustomer(
     annualAvailabilityNote: input.annualAvailabilityNote,
     priorContactRequired: input.priorContactRequired,
     priorContactNote: input.priorContactNote,
+    switchgearRequestRequired: input.switchgearRequestRequired,
+    switchgearRequestNote: input.switchgearRequestNote,
     billingCycleId: input.billingCycleId,
     paymentLagMonths: input.paymentLagMonths,
     isActive: input.isActive,
@@ -272,45 +277,111 @@ export function suggestCustomerCode(
 
 /* --------------------------------- 点検実績 --------------------------------- */
 
-export function setInspectionDone(
+export type InspectionKey = {
+  customerId: number;
+  year: number;
+  month: number;
+  type: InspectionType;
+};
+
+/**
+ * 顧客×年月×種別の実績レコードに部分更新をかける。
+ * まだ無ければ空のレコードを作ってから当てる。
+ */
+function patchInspectionRecord(
   doc: AppDocument,
-  input: {
-    customerId: number;
-    year: number;
-    month: number;
-    type: InspectionType;
-    isDone: boolean;
-    doneDate?: string | null;
-  },
+  key: InspectionKey,
+  patch: Partial<Omit<InspectionRecord, "id" | keyof InspectionKey>>,
 ): AppDocument {
-  const doneDate = input.isDone ? (input.doneDate ?? todayIso()) : null;
   const found = doc.inspectionRecords.find(
     (r) =>
-      r.customerId === input.customerId &&
-      r.year === input.year &&
-      r.month === input.month &&
-      r.type === input.type,
+      r.customerId === key.customerId &&
+      r.year === key.year &&
+      r.month === key.month &&
+      r.type === key.type,
   );
 
   const records = found
-    ? doc.inspectionRecords.map((r) =>
-        r.id === found.id ? { ...r, isDone: input.isDone ? 1 : 0, doneDate } : r,
-      )
+    ? doc.inspectionRecords.map((r) => (r.id === found.id ? { ...r, ...patch } : r))
     : [
         ...doc.inspectionRecords,
         {
           id: nextId(doc.inspectionRecords),
-          customerId: input.customerId,
-          year: input.year,
-          month: input.month,
-          type: input.type,
-          isDone: input.isDone ? 1 : 0,
-          doneDate,
+          // 呼び出し側の入力をそのまま広げると、呼び出し用の引数まで記録に混ざる
+          customerId: key.customerId,
+          year: key.year,
+          month: key.month,
+          type: key.type,
+          isDone: 0,
+          doneDate: null,
+          isReported: 0,
+          reportedDate: null,
+          isSwitchgearRequested: 0,
+          switchgearRequestedDate: null,
+          needsHelper: 0,
+          helperName: "",
           note: null,
+          ...patch,
         },
       ];
 
   return touch({ ...doc, inspectionRecords: records });
+}
+
+export function setInspectionDone(
+  doc: AppDocument,
+  input: InspectionKey & { isDone: boolean; doneDate?: string | null },
+): AppDocument {
+  return patchInspectionRecord(doc, input, {
+    isDone: input.isDone ? 1 : 0,
+    doneDate: input.isDone ? (input.doneDate ?? todayIso()) : null,
+  });
+}
+
+/**
+ * 報告書の提出チェック。点検を終えても提出はあとになるので、実施とは別に持つ。
+ */
+export function setInspectionReported(
+  doc: AppDocument,
+  input: InspectionKey & { isReported: boolean; reportedDate?: string | null },
+): AppDocument {
+  return patchInspectionRecord(doc, input, {
+    isReported: input.isReported ? 1 : 0,
+    reportedDate: input.isReported ? (input.reportedDate ?? todayIso()) : null,
+  });
+}
+
+/**
+ * 中電PGへの開閉器操作の申し込み。年次点検の停電に要るもので、
+ * 申し込みは点検日より前に済ませるため、実施チェックとは別に持つ。
+ */
+export function setInspectionSwitchgearRequested(
+  doc: AppDocument,
+  input: InspectionKey & { isRequested: boolean; requestedDate?: string | null },
+): AppDocument {
+  return patchInspectionRecord(doc, input, {
+    isSwitchgearRequested: input.isRequested ? 1 : 0,
+    switchgearRequestedDate: input.isRequested
+      ? (input.requestedDate ?? todayIso())
+      : null,
+  });
+}
+
+/**
+ * 年次点検の応援依頼。要・不要と、頼む相手を持つ。
+ * 不要に戻したときは相手も消す。
+ */
+export function setInspectionHelper(
+  doc: AppDocument,
+  input: InspectionKey & { needsHelper?: boolean; helperName?: string },
+): AppDocument {
+  const patch: Partial<InspectionRecord> = {};
+  if (input.needsHelper !== undefined) {
+    patch.needsHelper = input.needsHelper ? 1 : 0;
+    if (!input.needsHelper) patch.helperName = "";
+  }
+  if (input.helperName !== undefined) patch.helperName = input.helperName;
+  return patchInspectionRecord(doc, input, patch);
 }
 
 /* ---------------------------------- 覚書 ---------------------------------- */
@@ -321,41 +392,11 @@ export function setInspectionDone(
  */
 export function setInspectionNote(
   doc: AppDocument,
-  input: {
-    customerId: number;
-    year: number;
-    month: number;
-    type: InspectionType;
-    note: string;
-  },
+  input: InspectionKey & { note: string },
 ): AppDocument {
-  const found = doc.inspectionRecords.find(
-    (r) =>
-      r.customerId === input.customerId &&
-      r.year === input.year &&
-      r.month === input.month &&
-      r.type === input.type,
-  );
-
-  const note = input.note.trim() === "" ? null : input.note;
-
-  const records = found
-    ? doc.inspectionRecords.map((r) => (r.id === found.id ? { ...r, note } : r))
-    : [
-        ...doc.inspectionRecords,
-        {
-          id: nextId(doc.inspectionRecords),
-          customerId: input.customerId,
-          year: input.year,
-          month: input.month,
-          type: input.type,
-          isDone: 0,
-          doneDate: null,
-          note,
-        },
-      ];
-
-  return touch({ ...doc, inspectionRecords: records });
+  return patchInspectionRecord(doc, input, {
+    note: input.note.trim() === "" ? null : input.note,
+  });
 }
 
 /**

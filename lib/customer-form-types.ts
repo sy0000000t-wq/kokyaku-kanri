@@ -78,6 +78,8 @@ export type CustomerFormValues = {
   annualAvailabilityNote: string;
   priorContactRequired: number;
   priorContactNote: string;
+  switchgearRequestRequired: number;
+  switchgearRequestNote: string;
   billingCycleId: number | null;
   paymentLagMonths: number;
   isActive: number;
@@ -144,6 +146,8 @@ export function emptyCustomer(
     annualAvailabilityNote: "",
     priorContactRequired: 0,
     priorContactNote: "",
+    switchgearRequestRequired: 0,
+    switchgearRequestNote: "",
     billingCycleId: masters.billingCycles[0]?.id ?? null,
     paymentLagMonths: 1,
     isActive: 1,

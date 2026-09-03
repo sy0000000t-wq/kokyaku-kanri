@@ -131,6 +131,10 @@ export type Customer = {
   priorContactRequired: number;
   /** 事前連絡の補足（何日前・誰に・どの手段か） */
   priorContactNote: string;
+  /** 年次点検の停電に、中電PGへの開閉器操作申し込みが要るか */
+  switchgearRequestRequired: number;
+  /** 開閉器操作申し込みの補足（申込先・期限など） */
+  switchgearRequestNote: string;
   billingCycleId: number | null;
   paymentLagMonths: number;
   isActive: number;
@@ -171,6 +175,16 @@ export type InspectionRecord = {
   type: InspectionType;
   isDone: number;
   doneDate: string | null;
+  /** 報告書を提出したか。点検の実施とは別に管理する */
+  isReported: number;
+  reportedDate: string | null;
+  /** 中電PGへ開閉器操作を申し込んだか（年次点検のレコードでのみ使う） */
+  isSwitchgearRequested: number;
+  switchgearRequestedDate: string | null;
+  /** 年次点検で応援を頼むか（年次点検のレコードでのみ使う） */
+  needsHelper: number;
+  /** 応援を頼む相手。複数なら「〇〇、△△」のように書く */
+  helperName: string;
   note: string | null;
 };
 

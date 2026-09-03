@@ -44,6 +44,8 @@ function customer(overrides: Partial<Customer> = {}): Customer {
     annualAvailabilityNote: "",
     priorContactRequired: 0,
     priorContactNote: "",
+    switchgearRequestRequired: 0,
+    switchgearRequestNote: "",
     billingCycleId: 1,
     paymentLagMonths: 1,
     isActive: 1,

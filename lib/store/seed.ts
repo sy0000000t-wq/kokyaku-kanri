@@ -167,13 +167,26 @@ export function parseDocument(raw: unknown): AppDocument {
       annualAvailabilityNote: c.annualAvailabilityNote ?? "",
       priorContactRequired: c.priorContactRequired ?? 0,
       priorContactNote: c.priorContactNote ?? "",
+      switchgearRequestRequired: c.switchgearRequestRequired ?? 0,
+      switchgearRequestNote: c.switchgearRequestNote ?? "",
     })),
     // 設備ごとの点検開始月は後から足したので、無ければ顧客に合わせる（null）
     customerFacilities: (list("customerFacilities") as AppDocument["customerFacilities"]).map(
       (f) => ({ ...f, startMonth: f.startMonth ?? null }),
     ),
     customerInspectionMonths: list("customerInspectionMonths"),
-    inspectionRecords: list("inspectionRecords"),
+    // 報告書提出と応援依頼は後から足したので、既定値を補う
+    inspectionRecords: (list("inspectionRecords") as AppDocument["inspectionRecords"]).map(
+      (r) => ({
+        ...r,
+        isReported: r.isReported ?? 0,
+        reportedDate: r.reportedDate ?? null,
+        isSwitchgearRequested: r.isSwitchgearRequested ?? 0,
+        switchgearRequestedDate: r.switchgearRequestedDate ?? null,
+        needsHelper: r.needsHelper ?? 0,
+        helperName: r.helperName ?? "",
+      }),
+    ),
     billingRecords: list("billingRecords"),
     // 以前は年月ごとの覚書だった。月次の重点実施項目として引き継ぐ
     monthlyFocus: Array.isArray(d.monthlyFocus)

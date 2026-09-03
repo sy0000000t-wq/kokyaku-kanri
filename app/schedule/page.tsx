@@ -5,6 +5,11 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { InspectionCheck } from "@/components/schedule/inspection-check";
+import {
+  HelperFields,
+  ReportedCheck,
+  SwitchgearRequestCheck,
+} from "@/components/schedule/inspection-extras";
 import { InspectionNote } from "@/components/schedule/inspection-note";
 import { FocusItems } from "@/components/schedule/focus-items";
 import { PeriodNav } from "@/components/period-nav";
@@ -59,6 +64,9 @@ function SchedulePageInner() {
   const regularCount = monthCells.filter((c) => c.type === "regular").length;
   const annualCount = monthCells.filter((c) => c.type === "annual").length;
   const doneCount = monthCells.filter((c) => c.isDone).length;
+  const reportedCount = monthCells.filter((c) => c.isReported).length;
+  // 点検は終えたのに報告書がまだ、という積み残しを見えるようにする
+  const unreportedCount = monthCells.filter((c) => c.isDone && !c.isReported).length;
 
   return (
     <div className="space-y-4">
@@ -78,7 +86,7 @@ function SchedulePageInner() {
         <Card className="overflow-hidden">
           <CardHeader
             title="年間マトリクス"
-            description="上段が予定（● 通常／★ 年次／− 対象外）、下段が実施チェック"
+            description="上段が予定（● 通常／★ 年次／− 対象外）、中段が実施チェック（緑）、下段が報告書提出チェック（青）"
           />
           {rows.length === 0 ? (
             <EmptyState>表示できる顧客がありません。</EmptyState>
@@ -194,6 +202,31 @@ function SchedulePageInner() {
                                 />
                               )}
                             </div>
+                            {/* 報告書は提出が後日になるので、実施と別の段でチェックする */}
+                            <div className="flex justify-center gap-1">
+                              {showRegular && (
+                                <ReportedCheck
+                                  customerId={c.id}
+                                  customerName={c.name}
+                                  year={period.year}
+                                  month={m}
+                                  type="regular"
+                                  isReported={regular.isReported}
+                                  compact
+                                />
+                              )}
+                              {showAnnual && (
+                                <ReportedCheck
+                                  customerId={c.id}
+                                  customerName={c.name}
+                                  year={period.year}
+                                  month={m}
+                                  type="annual"
+                                  isReported={annual.isReported}
+                                  compact
+                                />
+                              )}
+                            </div>
                           </td>
                         );
                       })}
@@ -219,6 +252,20 @@ function SchedulePageInner() {
                 {doneCount} 件
               </span>
             </SumRow>
+            <SumRow label="報告書提出 ✓" strong>
+              <span
+                className={cn(
+                  reportedCount === monthCells.length && monthCells.length > 0 && "text-ok",
+                )}
+              >
+                {reportedCount} 件
+              </span>
+            </SumRow>
+            {unreportedCount > 0 && (
+              <SumRow label="点検済・報告書まだ">
+                <span className="text-warn">{unreportedCount} 件</span>
+              </SumRow>
+            )}
           </dl>
         </Card>
       </div>
@@ -335,6 +382,11 @@ function InspectionListItem({
           {cell.type === "annual" && c.annualAvailability !== "unspecified" && (
             <Badge>{AVAILABILITY_LABEL[c.annualAvailability]}</Badge>
           )}
+          {cell.type === "annual" && !!c.switchgearRequestRequired && (
+            <Badge tone={cell.isSwitchgearRequested ? "ok" : "warn"}>
+              中電PG開閉器操作 {cell.isSwitchgearRequested ? "申込済み" : "要申込"}
+            </Badge>
+          )}
         </div>
 
         {/* 訪問周期より長い周期の設備は、該当月だけここに出る */}
@@ -396,6 +448,49 @@ function InspectionListItem({
             label="実施済み"
           />
         </div>
+
+        {/* 点検を終えても提出はあとになるので、実施とは別にチェックする */}
+        <div className="flex items-center justify-end gap-3">
+          {cell.reportedDate && (
+            <span className="tabular text-xs text-muted">
+              {formatDate(cell.reportedDate)}
+            </span>
+          )}
+          <ReportedCheck
+            customerId={c.id}
+            customerName={c.name}
+            year={period.year}
+            month={period.month}
+            type={cell.type}
+            isReported={cell.isReported}
+          />
+        </div>
+
+        {/* 停電に開閉器操作の申し込みが要る物件は、出したかどうかを追う */}
+        {cell.type === "annual" && !!c.switchgearRequestRequired && (
+          <SwitchgearRequestCheck
+            customerId={c.id}
+            customerName={c.name}
+            year={period.year}
+            month={period.month}
+            type={cell.type}
+            isRequested={cell.isSwitchgearRequested}
+            note={c.switchgearRequestNote}
+          />
+        )}
+
+        {/* 年次点検はひとりで回せないことがあるので、応援の段取りをここに残す */}
+        {cell.type === "annual" && (
+          <HelperFields
+            customerId={c.id}
+            customerName={c.name}
+            year={period.year}
+            month={period.month}
+            type={cell.type}
+            needsHelper={cell.needsHelper}
+            helperName={cell.helperName}
+          />
+        )}
         {/* 訪問前に思い出したいことを、その月の予定に紐づけて残す */}
         <InspectionNote
           customerId={c.id}

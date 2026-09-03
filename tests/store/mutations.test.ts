@@ -12,7 +12,10 @@ import {
   setBillingAmount,
   setCustomerActive,
   setInspectionDone,
+  setInspectionHelper,
   setInspectionNote,
+  setInspectionReported,
+  setInspectionSwitchgearRequested,
   setMonthlyFocus,
   getMonthlyFocus,
   saveAnnualFocus,
@@ -65,6 +68,8 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
     annualAvailabilityNote: "",
     priorContactRequired: 0,
     priorContactNote: "",
+    switchgearRequestRequired: 0,
+    switchgearRequestNote: "",
     billingCycleId: doc.billingCycles[0].id,
     paymentLagMonths: 1,
     isActive: 1,
@@ -602,5 +607,213 @@ describe("覚書", () => {
     });
     const removed = deleteAnnualFocus(withItem, withItem.annualFocus[0].id);
     expect(removed.annualFocus).toHaveLength(0);
+  });
+});
+
+describe("報告書の提出と年次点検の応援依頼", () => {
+  const key = { customerId: 1, year: 2026, month: 9, type: "annual" as const };
+
+  it("報告書の提出は実施チェックとは別に持つ", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const k = { ...key, customerId };
+
+    const reported = setInspectionReported(first, { ...k, isReported: true });
+
+    expect(reported.inspectionRecords).toHaveLength(1);
+    expect(reported.inspectionRecords[0].isReported).toBe(1);
+    expect(reported.inspectionRecords[0].reportedDate).not.toBeNull();
+    // 点検を実施したことにはならない
+    expect(reported.inspectionRecords[0].isDone).toBe(0);
+  });
+
+  it("実施と報告書は同じレコードに積み上がる", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const k = { ...key, customerId };
+
+    const done = setInspectionDone(first, { ...k, isDone: true, doneDate: "2026-09-10" });
+    const reported = setInspectionReported(done, {
+      ...k,
+      isReported: true,
+      reportedDate: "2026-09-25",
+    });
+
+    expect(reported.inspectionRecords).toHaveLength(1);
+    expect(reported.inspectionRecords[0].doneDate).toBe("2026-09-10");
+    expect(reported.inspectionRecords[0].reportedDate).toBe("2026-09-25");
+  });
+
+  it("提出を外すと提出日も消える", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const k = { ...key, customerId };
+
+    const on = setInspectionReported(first, { ...k, isReported: true });
+    const off = setInspectionReported(on, { ...k, isReported: false });
+
+    expect(off.inspectionRecords[0].isReported).toBe(0);
+    expect(off.inspectionRecords[0].reportedDate).toBeNull();
+  });
+
+  it("年次点検に応援の要・不要と応援者を持てる", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const k = { ...key, customerId };
+
+    const needs = setInspectionHelper(first, { ...k, needsHelper: true });
+    const named = setInspectionHelper(needs, { ...k, helperName: "山田、佐藤" });
+
+    expect(named.inspectionRecords).toHaveLength(1);
+    expect(named.inspectionRecords[0].needsHelper).toBe(1);
+    expect(named.inspectionRecords[0].helperName).toBe("山田、佐藤");
+  });
+
+  it("応援を不要に戻すと応援者も消える", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const k = { ...key, customerId };
+
+    const named = setInspectionHelper(
+      setInspectionHelper(first, { ...k, needsHelper: true }),
+      { ...k, helperName: "山田" },
+    );
+    const cleared = setInspectionHelper(named, { ...k, needsHelper: false });
+
+    expect(cleared.inspectionRecords[0].needsHelper).toBe(0);
+    expect(cleared.inspectionRecords[0].helperName).toBe("");
+  });
+
+  it("通常点検と年次点検の記録は混ざらない", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+
+    const annual = setInspectionReported(first, {
+      customerId,
+      year: 2026,
+      month: 9,
+      type: "annual",
+      isReported: true,
+    });
+    const both = setInspectionReported(annual, {
+      customerId,
+      year: 2026,
+      month: 9,
+      type: "regular",
+      isReported: false,
+    });
+
+    expect(both.inspectionRecords).toHaveLength(2);
+    expect(both.inspectionRecords.find((r) => r.type === "annual")?.isReported).toBe(1);
+    expect(both.inspectionRecords.find((r) => r.type === "regular")?.isReported).toBe(0);
+  });
+});
+
+describe("中電PGの開閉器操作申し込み", () => {
+  const key = { customerId: 1, year: 2026, month: 9, type: "annual" as const };
+
+  it("申し込みの要否は顧客に、申込済みかは年次点検の記録に持つ", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, {
+      ...input(doc),
+      switchgearRequestRequired: 1,
+      switchgearRequestNote: "豊田営業所へ2週間前まで",
+    });
+
+    expect(first.customers[0].switchgearRequestRequired).toBe(1);
+    expect(first.customers[0].switchgearRequestNote).toBe("豊田営業所へ2週間前まで");
+
+    const requested = setInspectionSwitchgearRequested(first, {
+      ...key,
+      customerId,
+      isRequested: true,
+      requestedDate: "2026-08-20",
+    });
+
+    expect(requested.inspectionRecords).toHaveLength(1);
+    expect(requested.inspectionRecords[0].isSwitchgearRequested).toBe(1);
+    expect(requested.inspectionRecords[0].switchgearRequestedDate).toBe("2026-08-20");
+    // 申し込みは点検の実施でも報告書の提出でもない
+    expect(requested.inspectionRecords[0].isDone).toBe(0);
+    expect(requested.inspectionRecords[0].isReported).toBe(0);
+  });
+
+  it("申込を外すと申込日も消える", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const k = { ...key, customerId };
+
+    const on = setInspectionSwitchgearRequested(first, { ...k, isRequested: true });
+    const off = setInspectionSwitchgearRequested(on, { ...k, isRequested: false });
+
+    expect(off.inspectionRecords[0].isSwitchgearRequested).toBe(0);
+    expect(off.inspectionRecords[0].switchgearRequestedDate).toBeNull();
+  });
+
+  it("年ごとに別の記録になる", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+
+    const y2026 = setInspectionSwitchgearRequested(first, {
+      ...key,
+      customerId,
+      isRequested: true,
+    });
+    const y2027 = setInspectionSwitchgearRequested(y2026, {
+      ...key,
+      customerId,
+      year: 2027,
+      isRequested: false,
+    });
+
+    expect(y2027.inspectionRecords).toHaveLength(2);
+    expect(
+      y2027.inspectionRecords.find((r) => r.year === 2026)?.isSwitchgearRequested,
+    ).toBe(1);
+    expect(
+      y2027.inspectionRecords.find((r) => r.year === 2027)?.isSwitchgearRequested,
+    ).toBe(0);
+  });
+});
+
+describe("点検実績のレコードの形", () => {
+  it("呼び出し用の引数は記録に混ざらない", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const key = { customerId, year: 2026, month: 9, type: "annual" as const };
+
+    const next = setInspectionSwitchgearRequested(first, { ...key, isRequested: true });
+    const record = next.inspectionRecords[0];
+
+    expect(Object.keys(record).sort()).toEqual(
+      [
+        "customerId",
+        "doneDate",
+        "helperName",
+        "id",
+        "isDone",
+        "isReported",
+        "isSwitchgearRequested",
+        "month",
+        "needsHelper",
+        "note",
+        "reportedDate",
+        "switchgearRequestedDate",
+        "type",
+        "year",
+      ].sort(),
+    );
+  });
+
+  it("応援者だけを書いても、ほかの項目は既定のまま", () => {
+    const doc = createInitialDocument();
+    const { doc: first, customerId } = saveCustomer(doc, input(doc));
+    const key = { customerId, year: 2026, month: 9, type: "annual" as const };
+
+    const next = setInspectionHelper(first, { ...key, helperName: "山田" });
+
+    expect(next.inspectionRecords[0].helperName).toBe("山田");
+    expect(next.inspectionRecords[0].needsHelper).toBe(0);
+    expect(next.inspectionRecords[0].isDone).toBe(0);
   });
 });
