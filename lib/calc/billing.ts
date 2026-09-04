@@ -1,3 +1,4 @@
+import type { BillingCoverage } from "@/lib/store/document";
 import { roundYen } from "./round";
 import {
   addMonths,
@@ -33,6 +34,10 @@ export function generateBillingMonths(
  * その請求が何月分をまとめたものかを返す（古い順）。
  * 「3・4月分」のように画面へ出して、取り違えを防ぐために使う。
  *
+ * coverage = "single" は、実施した月をその月に請求する契約（年次請けなど）。
+ * 当月分だけが対象になる。
+ *
+ * coverage = "period" は、期間ぶんをまとめて後払いする保安管理契約。
  * 請求月は不規則でもよいので、間隔からではなく
  * 「ひとつ前の請求月の翌月から、この請求月まで」で数える。
  * 例）請求月 4・6・8・10・12・2月 のとき 4月請求は 3・4月分
@@ -42,8 +47,10 @@ export function generateBillingMonths(
 export function billedMonths(
   billingMonths: number[],
   billingMonth: number,
+  coverage: BillingCoverage = "period",
 ): number[] {
   const month = normalizeMonth(billingMonth);
+  if (coverage === "single") return [month];
   const months = [...new Set(billingMonths.map(normalizeMonth))];
 
   const span = (length: number) => {

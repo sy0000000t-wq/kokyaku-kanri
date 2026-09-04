@@ -72,6 +72,7 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
     switchgearRequestRequired: 0,
     switchgearRequestNote: "",
     billingCycleId: doc.billingCycles[0].id,
+    billingCoverage: "period" as const,
     paymentLagMonths: 1,
     isActive: 1,
     note: "",

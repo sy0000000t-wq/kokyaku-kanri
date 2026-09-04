@@ -81,6 +81,7 @@ export type CustomerFormValues = {
   switchgearRequestRequired: number;
   switchgearRequestNote: string;
   billingCycleId: number | null;
+  billingCoverage: "period" | "single";
   paymentLagMonths: number;
   isActive: number;
   note: string;
@@ -150,6 +151,7 @@ export function emptyCustomer(
     switchgearRequestRequired: 0,
     switchgearRequestNote: "",
     billingCycleId: masters.billingCycles[0]?.id ?? null,
+    billingCoverage: "period",
     paymentLagMonths: 1,
     isActive: 1,
     note: "",

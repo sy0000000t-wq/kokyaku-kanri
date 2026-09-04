@@ -47,6 +47,7 @@ function customer(overrides: Partial<Customer> = {}): Customer {
     switchgearRequestRequired: 0,
     switchgearRequestNote: "",
     billingCycleId: 1,
+    billingCoverage: "period" as const,
     paymentLagMonths: 1,
     isActive: 1,
     note: "",

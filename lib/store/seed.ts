@@ -186,6 +186,8 @@ export function parseDocument(raw: unknown): AppDocument {
       priorContactNote: c.priorContactNote ?? "",
       switchgearRequestRequired: c.switchgearRequestRequired ?? 0,
       switchgearRequestNote: c.switchgearRequestNote ?? "",
+      // これまでは期間ぶんをまとめる前提だったので、既定はそのまま
+      billingCoverage: c.billingCoverage ?? "period",
     })),
     // 設備ごとの点検開始月は後から足したので、無ければ顧客に合わせる（null）
     customerFacilities: (list("customerFacilities") as AppDocument["customerFacilities"]).map(

@@ -268,3 +268,42 @@ describe("formatBilledMonths：何月分の表示", () => {
     expect(formatBilledMonths([])).toBe("");
   });
 });
+
+describe("当月分のみの請求（年次請け・不規則な物件）", () => {
+  it("実施した月をその月に請求するので、対象は当月だけ", () => {
+    // 巡回 5・8・11月。まとめずに、行った月のぶんだけ請求する
+    const months = [5, 8, 11];
+    expect(billedMonths(months, 5, "single")).toEqual([5]);
+    expect(billedMonths(months, 8, "single")).toEqual([8]);
+    expect(billedMonths(months, 11, "single")).toEqual([11]);
+  });
+
+  it("年1回でも12ヶ月分にはならない", () => {
+    expect(billedMonths([2], 2, "single")).toEqual([2]);
+    // まとめて請求する契約なら、これまでどおり12ヶ月分
+    expect(billedMonths([2], 2, "period")).toHaveLength(12);
+  });
+
+  it("表示は「◯月分」だけになる", () => {
+    expect(formatBilledMonths(billedMonths([2], 2, "single"))).toBe("2月分");
+  });
+
+  it("請求額は1ヶ月ぶん。年次点検月なら年次点検費が乗る", () => {
+    const base = {
+      monthlyIncl: 5500,
+      annualFeeHandling: "separate" as const,
+      annualInspectionFeeIncl: 44000,
+      annualInspectionMonth: 2,
+    };
+
+    // 巡回の月は月額1ヶ月ぶんだけ
+    expect(
+      calcDefaultBillingAmount({ ...base, targetMonth: 5, coveredMonthCount: 1 }),
+    ).toBe(5500);
+
+    // 年次点検の月は年次点検費が乗る
+    expect(
+      calcDefaultBillingAmount({ ...base, targetMonth: 2, coveredMonthCount: 1 }),
+    ).toBe(49500);
+  });
+});

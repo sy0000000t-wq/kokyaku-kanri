@@ -85,6 +85,7 @@ function EditCustomerPageInner() {
           switchgearRequestRequired: customer.switchgearRequestRequired,
           switchgearRequestNote: customer.switchgearRequestNote,
           billingCycleId: customer.billingCycleId,
+          billingCoverage: customer.billingCoverage,
           paymentLagMonths: customer.paymentLagMonths,
           isActive: customer.isActive,
           note: customer.note,

@@ -79,6 +79,9 @@ export function CustomerForm({
   );
   const [months, setMonths] = useState<number[]>(initial.inspectionMonths);
   const [billingMonths, setBillingMonths] = useState<number[]>(initial.billingMonths);
+  const [billingCoverage, setBillingCoverage] = useState<"period" | "single">(
+    initial.billingCoverage,
+  );
   const [dirty, setDirty] = useState(false);
   // 顧客IDは契約年月日から作る。手で書き換えたら以後は追随させない
   const [codeEdited, setCodeEdited] = useState(initial.id != null);
@@ -214,6 +217,7 @@ export function CustomerForm({
       priorContactNote: fields.priorContactNote,
       switchgearRequestNote: fields.switchgearRequestNote,
       billingCycleId: toNum(fields.billingCycleId),
+      billingCoverage,
       paymentLagMonths: toNum(fields.paymentLagMonths) ?? 1,
       isActive: isActive ? 1 : 0,
       note: fields.note,
@@ -713,6 +717,24 @@ export function CustomerForm({
               </Field>
 
               <Field
+                label="請求の対象"
+                className="sm:col-span-2"
+                hint="年次請けや不規則な契約は「当月分のみ」。実施した月をその月に請求します"
+              >
+                <Select
+                  value={billingCoverage}
+                  onChange={(e) =>
+                    setBillingCoverage(e.target.value as "period" | "single")
+                  }
+                >
+                  <option value="period">
+                    前回請求の翌月から当月まで（隔月なら2ヶ月分をまとめて）
+                  </option>
+                  <option value="single">当月分のみ（実施した月を請求）</option>
+                </Select>
+              </Field>
+
+              <Field
                 label="請求月"
                 className="sm:col-span-2"
                 hint="請求サイクルを選ぶとプリセットされます。不規則な契約はここで直接選べます"
@@ -725,7 +747,7 @@ export function CustomerForm({
                 <p className="mt-1.5 text-xs text-muted">
                   {billingMonths.length === 0
                     ? "請求月がありません。請求・入金には出てきません。"
-                    : `${describeBilling(billingMonths)}`}
+                    : describeBilling(billingMonths, billingCoverage)}
                 </p>
               </Field>
             </div>
@@ -924,8 +946,14 @@ function MonthPicker({
 }
 
 /** 「4月は3・4月分」のように、各請求が何月分になるかを1行で説明する */
-function describeBilling(billingMonths: number[]): string {
+function describeBilling(
+  billingMonths: number[],
+  coverage: "period" | "single",
+): string {
   return billingMonths
-    .map((m) => `${m}月は${formatBilledMonths(billedMonths(billingMonths, m))}`)
+    .map(
+      (m) =>
+        `${m}月は${formatBilledMonths(billedMonths(billingMonths, m, coverage))}`,
+    )
     .join(" ／ ");
 }

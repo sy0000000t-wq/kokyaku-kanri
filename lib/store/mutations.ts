@@ -4,6 +4,7 @@ import {
   nextId,
   type AnnualAvailability,
   type AppDocument,
+  type BillingCoverage,
   type BillingCycle,
   type CategoryCycle,
   type CoefficientRow,
@@ -67,6 +68,7 @@ export type CustomerInput = {
   switchgearRequestRequired: number;
   switchgearRequestNote: string;
   billingCycleId: number | null;
+  billingCoverage: BillingCoverage;
   paymentLagMonths: number;
   isActive: number;
   note: string;
@@ -124,6 +126,7 @@ export function saveCustomer(
     switchgearRequestRequired: input.switchgearRequestRequired,
     switchgearRequestNote: input.switchgearRequestNote,
     billingCycleId: input.billingCycleId,
+    billingCoverage: input.billingCoverage,
     paymentLagMonths: input.paymentLagMonths,
     isActive: input.isActive,
     note: input.note,

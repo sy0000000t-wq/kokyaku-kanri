@@ -140,7 +140,11 @@ export function buildBillingGrid(
       ym,
     );
 
-    const coveredMonths = billedMonths(customer.billingMonths, ym.month);
+    const coveredMonths = billedMonths(
+      customer.billingMonths,
+      ym.month,
+      customer.billingCoverage,
+    );
 
     const defaultAmount = calcDefaultBillingAmount({
       monthlyIncl: customer.pricing.monthlyIncl,

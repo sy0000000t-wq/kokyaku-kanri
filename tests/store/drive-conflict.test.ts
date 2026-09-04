@@ -45,7 +45,8 @@ function docWith(names: string[]): AppDocument {
     priorContactRequired: 0, priorContactNote: "",
  switchgearRequestRequired: 0,
  switchgearRequestNote: "",
-    billingCycleId: 1, paymentLagMonths: 1, isActive: 1, note: "",
+    billingCycleId: 1, billingCoverage: "period" as const,
+ paymentLagMonths: 1, isActive: 1, note: "",
     createdAt: "", updatedAt: "",
   }));
   return doc;

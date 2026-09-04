@@ -18,6 +18,12 @@ export type CapacityUnit = "kVA" | "kW" | "none";
  */
 export type CalculationMethod = "table" | "fixed" | "excluded";
 export type CategoryGroup = "demand" | "generation" | "other";
+/**
+ * 請求が何月分を対象にするか。
+ * period … 前回請求の翌月から当月まで（保安管理契約。隔月なら2ヶ月分）
+ * single … 当月分のみ（年次請けなど、実施した月をその月に請求する契約）
+ */
+export type BillingCoverage = "period" | "single";
 export type AnnualFeeHandling = "included" | "separate";
 /** 入力した金額が税抜か税込か */
 export type FeeTaxMode = "excluded" | "included";
@@ -141,6 +147,8 @@ export type Customer = {
   /** 開閉器操作申し込みの補足（申込先・期限など） */
   switchgearRequestNote: string;
   billingCycleId: number | null;
+  /** 請求が何月分を対象にするか */
+  billingCoverage: BillingCoverage;
   paymentLagMonths: number;
   isActive: number;
   note: string;
