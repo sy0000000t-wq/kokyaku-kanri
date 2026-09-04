@@ -97,8 +97,9 @@ function CustomersPageInner() {
   const filters = parseCustomerFilters(sp);
   const all = getCustomerViews(doc, indexes);
   const rows = applyCustomerFilters(all, filters);
-  // §5.3 集計は常に稼働中の行を対象にする
-  const summary = summarizeCustomers(all);
+  // §5.3 集計は表示している行が対象。絞り込むとその合計になる
+  const summary = summarizeCustomers(rows);
+  const activeCount = all.filter((c) => c.isActive).length;
 
   return (
     <div className="space-y-4">
@@ -106,7 +107,7 @@ function CustomersPageInner() {
         <div>
           <h1 className="text-lg font-semibold">顧客マスタ</h1>
           <p className="text-xs text-muted">
-            {rows.length} 件表示 / 稼働中 {summary.count} 件
+            {rows.length} 件表示 / 稼働中 {activeCount} 件
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -216,7 +217,7 @@ function CustomersPageInner() {
               <tfoot className="border-t-2 border-line bg-canvas text-xs">
                 <tr className="[&>td]:px-2.5 [&>td]:py-2">
                   <td colSpan={2} className="sticky-col left-0 font-medium">
-                    合計（稼働中 {summary.count} 件）
+                    合計（表示中 {summary.count} 件）
                   </td>
                   {shownColumns.map((col) => (
                     <td

@@ -170,17 +170,39 @@ describe("getCustomerViews（既存シートとの一致）", () => {
 });
 
 describe("summarizeCustomers", () => {
-  it("解除済みは集計に含めない", () => {
+  /** 稼働中1件（17,500円）と解除済1件（99,999円） */
+  function twoCustomers() {
     const doc = createInitialDocument();
     doc.customers.push(customer({ id: 1, code: "T01" }));
     doc.customers.push(customer({ id: 2, code: "T02", isActive: 0, monthlyFee: 99999 }));
     addFacility(doc, 1, CATEGORY.demandOver100, "2ヶ月に1回", 210);
     addFacility(doc, 2, CATEGORY.demandOver100, "2ヶ月に1回", 210);
+    return getCustomerViews(doc, buildIndexes(doc));
+  }
 
-    const summary = summarizeCustomers(getCustomerViews(doc, buildIndexes(doc)));
+  it("渡した行だけを集計する", () => {
+    const views = twoCustomers();
+    const summary = summarizeCustomers(views.filter((v) => v.isActive));
+
     expect(summary.count).toBe(1);
     expect(summary.monthlyExcl).toBe(17500);
     expect(summary.points).toBe(0.48);
+  });
+
+  it("絞り込んだ結果をそのまま合計できる", () => {
+    const views = twoCustomers();
+
+    // 1件だけに絞れば、その1件の合計になる
+    expect(summarizeCustomers([views[1]]).monthlyExcl).toBe(99999);
+    // 解除済みも、渡せば数える（表示している行が対象）
+    expect(summarizeCustomers(views).count).toBe(2);
+  });
+
+  it("空なら合計は 0、点数単価の平均は null", () => {
+    const summary = summarizeCustomers([]);
+    expect(summary.count).toBe(0);
+    expect(summary.monthlyExcl).toBe(0);
+    expect(summary.unitPriceAvg).toBeNull();
   });
 });
 

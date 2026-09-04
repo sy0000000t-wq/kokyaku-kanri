@@ -223,21 +223,22 @@ export function getCustomerView(
   return customer ? buildCustomerView(customer, doc, indexes) : null;
 }
 
-/** 集計フッター。対象は常に稼働中の行 */
+/** 集計フッター。渡された行の合計を出す（絞り込みの結果をそのまま集計できる） */
 export function summarizeCustomers(views: CustomerView[]) {
-  const active = views.filter((v) => v.isActive);
-  const points = active.reduce((sum, v) => sum + (v.points ?? 0), 0);
-  const withUnitPrice = active.filter((v) => v.pricing.unitPrice != null);
+  // 渡された行をそのまま集計する。絞り込んだ結果の合計を出せるように、
+  // ここでは稼働状態で選り分けない（表示する行は呼び出し側が決める）
+  const points = views.reduce((sum, v) => sum + (v.points ?? 0), 0);
+  const withUnitPrice = views.filter((v) => v.pricing.unitPrice != null);
 
   return {
-    count: active.length,
+    count: views.length,
     points: Math.round(points * 1000) / 1000,
-    monthlyExcl: active.reduce((s, v) => s + v.pricing.monthlyExcl, 0),
-    monthlyIncl: active.reduce((s, v) => s + v.pricing.monthlyIncl, 0),
-    annualExcl: active.reduce((s, v) => s + v.pricing.annualExcl, 0),
-    annualIncl: active.reduce((s, v) => s + v.pricing.annualIncl, 0),
+    monthlyExcl: views.reduce((s, v) => s + v.pricing.monthlyExcl, 0),
+    monthlyIncl: views.reduce((s, v) => s + v.pricing.monthlyIncl, 0),
+    annualExcl: views.reduce((s, v) => s + v.pricing.annualExcl, 0),
+    annualIncl: views.reduce((s, v) => s + v.pricing.annualIncl, 0),
     // 別途請求のものだけ足す（月額に含む物件は 0 として扱われる）
-    annualInspectionFeeExcl: active.reduce(
+    annualInspectionFeeExcl: views.reduce(
       (s, v) => s + v.pricing.annualInspectionFeeExcl,
       0,
     ),
