@@ -10,6 +10,7 @@ import {
   type CoefficientRow,
   type Customer,
   type CustomerFacility,
+  type FeeBasis,
   type EquipmentCategory,
   type InspectionCycle,
   type InspectionRecord,
@@ -47,6 +48,7 @@ export type CustomerInput = {
   inspectionCycleId: number;
   monthlyFee: number;
   monthlyFeeTaxMode: "excluded" | "included";
+  feeBasis: FeeBasis;
   annualFeeHandling: "included" | "separate";
   annualInspectionFee: number | null;
   annualFeeTaxMode: "excluded" | "included";
@@ -101,6 +103,7 @@ export function saveCustomer(
     inspectionCycleId: input.inspectionCycleId,
     monthlyFee: input.monthlyFee,
     monthlyFeeTaxMode: input.monthlyFeeTaxMode,
+    feeBasis: input.feeBasis,
     annualFeeHandling: input.annualFeeHandling,
     annualInspectionFee: input.annualInspectionFee,
     annualFeeTaxMode: input.annualFeeTaxMode,

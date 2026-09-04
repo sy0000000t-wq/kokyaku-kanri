@@ -67,10 +67,19 @@ export function CustomerCell({
       );
 
     case "monthly":
+      // 1回あたりの契約は月額そのものが無いので、何の値かを添える
       return (
         <>
           {formatYen(
             showTaxIncluded ? c.pricing.monthlyIncl : c.pricing.monthlyExcl,
+          )}
+          {c.feeBasis === "perVisit" && (
+            <div className="text-[11px] whitespace-nowrap text-muted">
+              {formatYen(
+                showTaxIncluded ? c.pricing.visitFeeIncl : c.pricing.visitFeeExcl,
+              )}{" "}
+              × {c.pricing.visitsPerYear}回
+            </div>
           )}
         </>
       );

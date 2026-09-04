@@ -214,3 +214,64 @@ describe("月額と年次点検費で税区分が違う契約", () => {
     expect(r.annualExcl).toBe(232000);
   });
 });
+
+describe("1回あたりの契約（巡回＋年次）", () => {
+  /** 巡回1回5,000円（税込）を年3回、年次点検40,000円（税込）を年1回 */
+  const chi01 = {
+    monthlyFee: 5000,
+    monthlyFeeTaxMode: "included" as const,
+    feeBasis: "perVisit" as const,
+    visitsPerYear: 3,
+    annualFeeHandling: "separate" as const,
+    annualInspectionFee: 40000,
+    annualFeeTaxMode: "included" as const,
+    taxRate: 0.1,
+    points: null,
+  };
+
+  it("年額は 巡回15,000円 ＋ 年次40,000円 ＝ 55,000円（税込）", () => {
+    const r = calcPricing(chi01);
+    expect(r.annualIncl).toBe(55000);
+    expect(r.annualExcl).toBe(50000);
+  });
+
+  it("巡回のぶんが内訳として引ける", () => {
+    const r = calcPricing(chi01);
+    expect(r.visitFeeIncl).toBe(5000);
+    expect(r.visitsPerYear).toBe(3);
+    expect(r.visitFeeIncl * r.visitsPerYear).toBe(15000);
+  });
+
+  it("月額換算は年額の12分の1", () => {
+    const r = calcPricing(chi01);
+    expect(r.monthlyIncl).toBe(Math.round(55000 / 12));
+  });
+
+  it("巡回がない年次だけの契約は年次点検費そのまま", () => {
+    const r = calcPricing({ ...chi01, monthlyFee: 0, visitsPerYear: 0 });
+    expect(r.annualIncl).toBe(40000);
+    expect(r.annualExcl).toBe(36364);
+  });
+
+  it("月額制はこれまでどおり12ヶ月ぶん", () => {
+    const r = calcPricing({
+      monthlyFee: 17500,
+      monthlyFeeTaxMode: "excluded",
+      feeBasis: "monthly",
+      annualFeeHandling: "included",
+      annualInspectionFee: null,
+      taxRate: 0.1,
+      points: null,
+    });
+    expect(r.annualExcl).toBe(210000);
+    expect(r.annualIncl).toBe(231000);
+    expect(r.monthlyExcl).toBe(17500);
+  });
+
+  it("1回ぶんを丸めてから掛けないので、端数が積み上がらない", () => {
+    // 4,545 × 3 = 13,635 ではなく、15,000 ÷ 1.1 = 13,636
+    const r = calcPricing({ ...chi01, annualFeeHandling: "included" });
+    expect(r.annualIncl).toBe(15000);
+    expect(r.annualExcl).toBe(13636);
+  });
+});

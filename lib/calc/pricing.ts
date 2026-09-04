@@ -3,11 +3,23 @@ import { roundYen } from "./round";
 export type AnnualFeeHandling = "included" | "separate";
 /** 入力した金額が税抜か税込か */
 export type FeeTaxMode = "excluded" | "included";
+/**
+ * 料金の決め方。
+ * monthly  … 月額 × 12ヶ月（保安管理契約）
+ * perVisit … 巡回1回あたり × 巡回回数（年次請け・不規則な物件）
+ */
+export type FeeBasis = "monthly" | "perVisit";
 
 export type PricingInput = {
-  /** 月額。税抜か税込かは monthlyFeeTaxMode で決まる */
+  /**
+   * 月額、または巡回1回あたりの金額（feeBasis で意味が変わる）。
+   * 税抜か税込かは monthlyFeeTaxMode で決まる
+   */
   monthlyFee: number;
   monthlyFeeTaxMode?: FeeTaxMode;
+  feeBasis?: FeeBasis;
+  /** perVisit のときの巡回回数（通常点検の実施月の数） */
+  visitsPerYear?: number;
   annualFeeHandling: AnnualFeeHandling;
   /** 年次点検費。separate のときのみ加算する */
   annualInspectionFee?: number | null;
@@ -20,8 +32,14 @@ export type PricingInput = {
 };
 
 export type PricingResult = {
+  /** 月額。perVisit のときは年額を12で割った月額換算 */
   monthlyExcl: number;
   monthlyIncl: number;
+  /** 巡回1回あたり。monthly のときは月額と同じ値 */
+  visitFeeExcl: number;
+  visitFeeIncl: number;
+  /** 年間の巡回回数。monthly のときは 12 */
+  visitsPerYear: number;
   annualExcl: number;
   annualIncl: number;
   /** 年次点検費。included のときは 0 */
@@ -39,10 +57,27 @@ export type PricingResult = {
  * 入力した側の値は丸め直さない。
  */
 function expand(amount: number, mode: FeeTaxMode, taxFactor: number) {
+  return expandTotal(amount, 1, mode, taxFactor);
+}
+
+/**
+ * 同じ金額を count 回ぶん積んだ合計を、税抜・税込の両方に展開する。
+ *
+ * 1回ぶんを丸めてから掛けると端数が積み上がるので、掛けてから1回だけ丸める。
+ * 例）税込5,000円を3回 → 税込15,000円・税抜13,636円
+ *     （1回ずつ割り戻して4,545×3=13,635 とはしない）
+ */
+function expandTotal(
+  amount: number,
+  count: number,
+  mode: FeeTaxMode,
+  taxFactor: number,
+) {
+  const total = amount * count;
   if (mode === "included") {
-    return { excl: roundYen(amount / taxFactor), incl: amount };
+    return { excl: roundYen(total / taxFactor), incl: total };
   }
-  return { excl: amount, incl: roundYen(amount * taxFactor) };
+  return { excl: total, incl: roundYen(total * taxFactor) };
 }
 
 /** 料金と点数単価 */
@@ -50,11 +85,16 @@ export function calcPricing(input: PricingInput): PricingResult {
   const taxFactor = 1 + input.taxRate;
 
   // 月額と年次点検費は、契約によって税抜・税込がそろっていないことがある
-  const monthly = expand(
+  const fee = expand(
     input.monthlyFee,
     input.monthlyFeeTaxMode ?? "excluded",
     taxFactor,
   );
+
+  const basis = input.feeBasis ?? "monthly";
+  // 月額制は毎月ぶん、1回あたりなら実際に行く回数ぶんを積む
+  const visitsPerYear =
+    basis === "perVisit" ? Math.max(0, Math.round(input.visitsPerYear ?? 0)) : 12;
 
   const rawAnnualFee =
     input.annualFeeHandling === "separate" ? (input.annualInspectionFee ?? 0) : 0;
@@ -64,9 +104,23 @@ export function calcPricing(input: PricingInput): PricingResult {
     taxFactor,
   );
 
-  // 年額は月額12回分と年次点検費の合計。請求する額をそのまま積み上げる
-  const annualExcl = monthly.excl * 12 + annualFee.excl;
-  const annualIncl = monthly.incl * 12 + annualFee.incl;
+  // 年間ぶんは、回数を掛けてから1回だけ税を計算する
+  const feeTotal = expandTotal(
+    input.monthlyFee,
+    visitsPerYear,
+    input.monthlyFeeTaxMode ?? "excluded",
+    taxFactor,
+  );
+
+  // 年額は巡回ぶんと年次点検費の合計
+  const annualExcl = feeTotal.excl + annualFee.excl;
+  const annualIncl = feeTotal.incl + annualFee.incl;
+
+  // 一覧では月額の列で見比べるので、1回あたりの契約は月額換算を出す
+  const monthly =
+    basis === "perVisit"
+      ? { excl: roundYen(annualExcl / 12), incl: roundYen(annualIncl / 12) }
+      : fee;
 
   const isUnitPriceOverridden =
     input.unitPriceOverride != null && Number.isFinite(input.unitPriceOverride);
@@ -82,6 +136,9 @@ export function calcPricing(input: PricingInput): PricingResult {
   return {
     monthlyExcl: monthly.excl,
     monthlyIncl: monthly.incl,
+    visitFeeExcl: fee.excl,
+    visitFeeIncl: fee.incl,
+    visitsPerYear,
     annualExcl,
     annualIncl,
     annualInspectionFeeExcl: annualFee.excl,

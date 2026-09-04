@@ -27,6 +27,8 @@ export type BillingCoverage = "period" | "single";
 export type AnnualFeeHandling = "included" | "separate";
 /** 入力した金額が税抜か税込か */
 export type FeeTaxMode = "excluded" | "included";
+/** 料金の決め方。月額×12 か、巡回1回あたり×回数か */
+export type FeeBasis = "monthly" | "perVisit";
 export type DistanceMethod = "road" | "straight";
 /** 年次点検を実施できる曜日の区分 */
 export type AnnualAvailability = "unspecified" | "weekday" | "holiday" | "any";
@@ -115,6 +117,8 @@ export type Customer = {
   monthlyFee: number;
   /** 月額を税抜で入れたか税込で入れたか */
   monthlyFeeTaxMode: FeeTaxMode;
+  /** 月額制か、巡回1回あたりか */
+  feeBasis: FeeBasis;
   annualFeeHandling: AnnualFeeHandling;
   annualInspectionFee: number | null;
   /** 年次点検費を税抜で入れたか税込で入れたか */

@@ -181,6 +181,9 @@ export function buildCustomerView(
   const pricing = calcPricing({
     monthlyFee: customer.monthlyFee,
     monthlyFeeTaxMode: customer.monthlyFeeTaxMode,
+    feeBasis: customer.feeBasis,
+    // 巡回1回あたりの契約は、通常点検の実施月の数がそのまま巡回回数になる
+    visitsPerYear: customerInspectionMonths.length,
     annualFeeHandling: customer.annualFeeHandling,
     annualInspectionFee: customer.annualInspectionFee,
     annualFeeTaxMode: customer.annualFeeTaxMode,

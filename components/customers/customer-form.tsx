@@ -82,6 +82,7 @@ export function CustomerForm({
   const [billingCoverage, setBillingCoverage] = useState<"period" | "single">(
     initial.billingCoverage,
   );
+  const [feeBasis, setFeeBasis] = useState<"monthly" | "perVisit">(initial.feeBasis);
   const [dirty, setDirty] = useState(false);
   // 顧客IDは契約年月日から作る。手で書き換えたら以後は追随させない
   const [codeEdited, setCodeEdited] = useState(initial.id != null);
@@ -135,6 +136,8 @@ export function CustomerForm({
     const pricing = calcPricing({
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
       monthlyFeeTaxMode,
+      feeBasis,
+      visitsPerYear: months.length,
       annualFeeHandling,
       annualInspectionFee: annualInspectionFee === "" ? null : Number(annualInspectionFee),
       annualFeeTaxMode,
@@ -149,6 +152,8 @@ export function CustomerForm({
     facilities,
     monthlyFee,
     monthlyFeeTaxMode,
+    feeBasis,
+    months,
     annualFeeTaxMode,
     annualFeeHandling,
     annualInspectionFee,
@@ -191,6 +196,7 @@ export function CustomerForm({
       inspectionCycleId,
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
       monthlyFeeTaxMode,
+      feeBasis,
       annualFeeHandling,
       annualInspectionFee:
         annualFeeHandling === "separate" ? toNum(annualInspectionFee) : null,
@@ -367,12 +373,28 @@ export function CustomerForm({
             />
             <div className="grid gap-3 p-4 sm:grid-cols-2">
               <Field
-                label="月額（円）"
+                label="料金の決め方"
+                className="sm:col-span-2"
+                hint="巡回のたびに請求する契約は「1回あたり」。年額は 1回あたり × 通常点検の実施月の数 ＋ 年次点検費 で出します"
+              >
+                <Select
+                  value={feeBasis}
+                  onChange={(e) =>
+                    setFeeBasis(e.target.value as "monthly" | "perVisit")
+                  }
+                >
+                  <option value="monthly">月額制（月額 × 12ヶ月）</option>
+                  <option value="perVisit">1回あたり（巡回1回の金額 × 巡回回数）</option>
+                </Select>
+              </Field>
+
+              <Field
+                label={feeBasis === "perVisit" ? "巡回1回あたり（円）" : "月額（円）"}
                 required
                 hint={
                   monthlyFeeTaxMode === "included"
-                    ? `税抜 ${formatYen(preview.pricing.monthlyExcl)}`
-                    : `税込 ${formatYen(preview.pricing.monthlyIncl)}`
+                    ? `税抜 ${formatYen(preview.pricing.visitFeeExcl)}`
+                    : `税込 ${formatYen(preview.pricing.visitFeeIncl)}`
                 }
               >
                 <div className="flex gap-2">
@@ -387,7 +409,11 @@ export function CustomerForm({
                   />
                   <Select
                     className="w-24 shrink-0"
-                    aria-label="月額が税抜か税込か"
+                    aria-label={
+                      feeBasis === "perVisit"
+                        ? "巡回1回あたりが税抜か税込か"
+                        : "月額が税抜か税込か"
+                    }
                     value={monthlyFeeTaxMode}
                     onChange={(e) =>
                       setMonthlyFeeTaxMode(e.target.value as "excluded" | "included")
@@ -786,8 +812,25 @@ export function CustomerForm({
               <Row label="保安管理点数 合計" strong>
                 {formatPoints(preview.total)}
               </Row>
-              <Row label="月額税抜">{formatYen(preview.pricing.monthlyExcl)}</Row>
-              <Row label="月額税込">{formatYen(preview.pricing.monthlyIncl)}</Row>
+              {feeBasis === "perVisit" && (
+                <Row label="巡回">
+                  <span className="text-xs text-muted">
+                    {formatYen(preview.pricing.visitFeeIncl)} ×{" "}
+                    {preview.pricing.visitsPerYear}回 =
+                  </span>
+                  <span className="ml-1.5">
+                    {formatYen(
+                      preview.pricing.visitFeeIncl * preview.pricing.visitsPerYear,
+                    )}
+                  </span>
+                </Row>
+              )}
+              <Row label={feeBasis === "perVisit" ? "月額換算 税抜" : "月額税抜"}>
+                {formatYen(preview.pricing.monthlyExcl)}
+              </Row>
+              <Row label={feeBasis === "perVisit" ? "月額換算 税込" : "月額税込"}>
+                {formatYen(preview.pricing.monthlyIncl)}
+              </Row>
               <Row label="年額税抜">{formatYen(preview.pricing.annualExcl)}</Row>
               <Row label="年額税込">{formatYen(preview.pricing.annualIncl)}</Row>
               <Row label="点数単価" strong>

@@ -5,4 +5,4 @@
  * 小数点以下を 1 ずつ足していき（V1.0 → V1.1 → V1.2…）、
  * 大きな作り替えのときだけ整数を上げる（V1.x → V2.0）。
  */
-export const APP_VERSION = "V1.1";
+export const APP_VERSION = "V1.2";

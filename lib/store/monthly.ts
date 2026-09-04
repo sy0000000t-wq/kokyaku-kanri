@@ -148,6 +148,9 @@ export function buildBillingGrid(
 
     const defaultAmount = calcDefaultBillingAmount({
       monthlyIncl: customer.pricing.monthlyIncl,
+      feeBasis: customer.feeBasis,
+      visitFeeIncl: customer.pricing.visitFeeIncl,
+      isInspectionMonth: customer.inspectionMonths.includes(ym.month),
       annualFeeHandling: customer.annualFeeHandling,
       annualInspectionFeeIncl: customer.pricing.annualInspectionFeeIncl,
       annualInspectionMonth: customer.annualInspectionMonth,

@@ -51,6 +51,7 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
     inspectionCycleId: doc.inspectionCycles[1].id,
     monthlyFee: 17500,
     monthlyFeeTaxMode: "excluded" as const,
+    feeBasis: "monthly" as const,
     annualFeeHandling: "included",
     annualInspectionFee: null,
     annualFeeTaxMode: "excluded" as const,

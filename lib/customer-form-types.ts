@@ -57,6 +57,7 @@ export type CustomerFormValues = {
   inspectionCycleId: number;
   monthlyFee: number;
   monthlyFeeTaxMode: "excluded" | "included";
+  feeBasis: "monthly" | "perVisit";
   annualFeeHandling: "included" | "separate";
   annualInspectionFee: number | null;
   annualFeeTaxMode: "excluded" | "included";
@@ -127,6 +128,7 @@ export function emptyCustomer(
     inspectionCycleId: cycle?.id ?? 0,
     monthlyFee: 0,
     monthlyFeeTaxMode: "excluded",
+    feeBasis: "monthly",
     annualFeeHandling: "included",
     annualInspectionFee: null,
     annualFeeTaxMode: "excluded",

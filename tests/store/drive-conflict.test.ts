@@ -31,6 +31,7 @@ function docWith(names: string[]): AppDocument {
     inspectionCycleId: 1,
     monthlyFee: 0,
     monthlyFeeTaxMode: "excluded" as const,
+    feeBasis: "monthly" as const,
     annualFeeHandling: "included" as const,
     annualInspectionFee: null,
     annualFeeTaxMode: "excluded" as const,

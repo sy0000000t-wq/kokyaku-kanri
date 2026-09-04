@@ -1,3 +1,4 @@
+import type { FeeBasis } from "./pricing";
 import type { BillingCoverage } from "@/lib/store/document";
 import { roundYen } from "./round";
 import {
@@ -95,6 +96,12 @@ export function isBillingTarget(
 export type BillingAmountInput = {
   /** 月額税込 */
   monthlyIncl: number;
+  /** 料金の決め方。perVisit は巡回1回あたりで請求する */
+  feeBasis?: FeeBasis;
+  /** 巡回1回あたりの税込額（perVisit のときに使う） */
+  visitFeeIncl?: number;
+  /** その月に通常点検（巡回）があるか（perVisit のときに使う） */
+  isInspectionMonth?: boolean;
   annualFeeHandling: "included" | "separate";
   /** 年次点検費の税込額 */
   annualInspectionFeeIncl: number;
@@ -107,11 +114,20 @@ export type BillingAmountInput = {
 /**
  * 請求額の既定値。
  *
- * 月額 × まとめる月数 ＋（別途請求 かつ 年次点検月と同月なら）年次点検費。
- * 隔月請求なら1回の請求で2ヶ月分をまとめて請求するため、月額をそのまま出すと不足する。
+ * 月額制なら 月額 × まとめる月数。隔月請求では1回で2ヶ月分をまとめるため、
+ * 月額をそのまま出すと不足する。
+ * 1回あたりの契約なら、その月に巡回があったぶんだけを積む。
+ * どちらも、別途請求の年次点検費は年次点検月に乗せる。
  */
 export function calcDefaultBillingAmount(input: BillingAmountInput): number {
   const months = Math.max(1, Math.round(input.coveredMonthCount ?? 1));
+
+  const base =
+    (input.feeBasis ?? "monthly") === "perVisit"
+      ? input.isInspectionMonth
+        ? (input.visitFeeIncl ?? 0)
+        : 0
+      : input.monthlyIncl * months;
 
   const annual =
     input.annualFeeHandling === "separate" &&
@@ -119,7 +135,7 @@ export function calcDefaultBillingAmount(input: BillingAmountInput): number {
       ? input.annualInspectionFeeIncl
       : 0;
 
-  return roundYen(input.monthlyIncl * months + annual);
+  return roundYen(base + annual);
 }
 
 /** §4.5 入金予定年月 ＝ 請求年月 ＋ payment_lag_months */

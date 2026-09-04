@@ -61,6 +61,7 @@ function EditCustomerPageInner() {
           inspectionCycleId: customer.inspectionCycleId,
           monthlyFee: customer.monthlyFee,
           monthlyFeeTaxMode: customer.monthlyFeeTaxMode,
+          feeBasis: customer.feeBasis,
           annualFeeHandling: customer.annualFeeHandling,
           annualInspectionFee: customer.annualInspectionFee,
           annualFeeTaxMode: customer.annualFeeTaxMode,
