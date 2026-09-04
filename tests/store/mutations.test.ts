@@ -5,6 +5,7 @@ import {
   deleteCategoryCycle,
   deleteCustomer,
   extractCustomer,
+  renameCustomerCodePrefix,
   suggestCustomerCode,
   saveCoefficientRows,
   saveCustomer,
@@ -995,5 +996,67 @@ describe("契約種別", () => {
 
     const parsed = parseDocument(JSON.parse(JSON.stringify(legacy)));
     expect(parsed.customers[0].contractType).toBe("annual");
+  });
+});
+
+describe("顧客IDの接頭辞をまとめて変える", () => {
+  function withCodes(codes: string[]) {
+    let doc = createInitialDocument();
+    for (const code of codes) {
+      doc = saveCustomer(doc, input(doc, { code, name: code })).doc;
+    }
+    return doc;
+  }
+
+  it("接頭辞だけを置き換え、後ろはそのまま残す", () => {
+    const doc = withCodes(["Ch01", "Ch02", "Ho260401"]);
+    const { doc: next, result } = renameCustomerCodePrefix(doc, "Ch", "Zch");
+
+    expect(result.renamed).toBe(2);
+    expect(next.customers.map((c) => c.code).sort()).toEqual([
+      "Ho260401",
+      "Zch01",
+      "Zch02",
+    ]);
+  });
+
+  it("実績は顧客IDではなく内部の紐づけなので切れない", () => {
+    let doc = withCodes(["Ch01"]);
+    const customerId = doc.customers[0].id;
+    doc = setInspectionDone(doc, {
+      customerId,
+      year: 2026,
+      month: 9,
+      type: "regular",
+      isDone: true,
+    });
+
+    const { doc: next } = renameCustomerCodePrefix(doc, "Ch", "Zch");
+
+    expect(next.customers[0].code).toBe("Zch01");
+    expect(next.inspectionRecords[0].customerId).toBe(customerId);
+  });
+
+  it("置き換え後の顧客IDが既にあるものは触らない", () => {
+    const doc = withCodes(["Ch01", "Zch01"]);
+    const { doc: next, result } = renameCustomerCodePrefix(doc, "Ch", "Zch");
+
+    expect(result.renamed).toBe(0);
+    expect(result.skipped.map((s) => s.code)).toEqual(["Ch01"]);
+    expect(next.customers.map((c) => c.code).sort()).toEqual(["Ch01", "Zch01"]);
+  });
+
+  it("該当がなければ何もしない", () => {
+    const doc = withCodes(["Ho260401"]);
+    const { doc: next, result } = renameCustomerCodePrefix(doc, "Ch", "Zch");
+
+    expect(result.renamed).toBe(0);
+    expect(next).toBe(doc);
+  });
+
+  it("空や同じ接頭辞なら何もしない", () => {
+    const doc = withCodes(["Ch01"]);
+    expect(renameCustomerCodePrefix(doc, "", "Zch").result.renamed).toBe(0);
+    expect(renameCustomerCodePrefix(doc, "Ch", "Ch").result.renamed).toBe(0);
   });
 });

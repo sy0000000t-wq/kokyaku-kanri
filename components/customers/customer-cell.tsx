@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { Badge } from "@/components/ui";
-import { AVAILABILITY_LABEL, type ColumnId } from "@/lib/customer-columns";
+import {
+  AVAILABILITY_LABEL,
+  CONTRACT_TYPE_SHORT,
+  type ColumnId,
+} from "@/lib/customer-columns";
 import type { CustomerView } from "@/lib/store/selectors";
 import {
   formatDate,
@@ -28,6 +32,13 @@ export function CustomerCell({
   const c = customer;
 
   switch (column) {
+    case "contractType":
+      return (
+        <Badge tone={c.contractType === "hoan" ? "brand" : "neutral"}>
+          {CONTRACT_TYPE_SHORT[c.contractType]}
+        </Badge>
+      );
+
     case "facilities":
       return c.facilities.length === 0 ? (
         <Badge tone="warn">設備が未登録</Badge>

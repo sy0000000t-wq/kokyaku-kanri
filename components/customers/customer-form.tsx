@@ -32,6 +32,7 @@ import type {
   FacilityFormValue,
   FormMasters,
 } from "@/lib/customer-form-types";
+import { CONTRACT_TYPE_LABEL } from "@/lib/customer-columns";
 import { cn, formatKm, formatPoints, formatYen, MONTHS, todayIso } from "@/lib/utils";
 import type { ContractType } from "@/lib/store/document";
 
@@ -401,9 +402,11 @@ export function CustomerForm({
                     }
                   }}
                 >
-                  <option value="hoan">保安管理契約</option>
-                  <option value="annual">保安管理契約外（年次請け）</option>
-                  <option value="other">その他</option>
+                  {(["hoan", "annual", "other"] as const).map((t) => (
+                    <option key={t} value={t}>
+                      {CONTRACT_TYPE_LABEL[t]}
+                    </option>
+                  ))}
                 </Select>
               </Field>
 

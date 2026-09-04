@@ -99,9 +99,9 @@ export function FacilityRows({
           row,
           masters,
         );
-        // 換算係数の対象外。容量も係数も点数に効かないので出さない
+        // 換算係数の対象外。係数は出さないが、容量は控えとして書ける
         const isExcluded = category?.calculationMethod === "excluded";
-        const needsCapacity = category?.capacityUnit !== "none" && !isExcluded;
+        const needsCapacity = category?.capacityUnit !== "none" || isExcluded;
         const isTable = category?.calculationMethod === "table";
 
         // 毎月の設備は訪問のたびに点検するので、開始月をずらす意味がない
@@ -191,7 +191,12 @@ export function FacilityRows({
               {needsCapacity && (
                 <div>
                   <label className="mb-1 block text-xs text-muted">
-                    設備容量（{category?.capacityUnit}）
+                    {category?.capacityUnit === "none"
+                      ? "設備容量"
+                      : `設備容量（${category?.capacityUnit}）`}
+                    {isExcluded && (
+                      <span className="ml-1 font-normal">（任意）</span>
+                    )}
                   </label>
                   <Input
                     type="number"
@@ -359,6 +364,7 @@ export function FacilityRows({
             {isExcluded && (
               <p className="mt-2 text-xs text-muted">
                 この区分は換算係数を適用しません。保安管理点数には算入しません（0点）。
+                設備容量は控えとして残すだけで、点数には効きません。
               </p>
             )}
             {category?.note && (

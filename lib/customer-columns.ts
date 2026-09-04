@@ -1,7 +1,9 @@
+import type { ContractType } from "@/lib/store/document";
 import type { CustomerView } from "@/lib/store/selectors";
 
 /** 顧客マスタ一覧の列。表示するかどうかは端末ごとに憶えておく */
 export type ColumnId =
+  | "contractType"
   | "facilities"
   | "inspectionCycle"
   | "points"
@@ -31,6 +33,7 @@ export const COLUMNS: ColumnDef[] = [
   { id: "inspectionCycle", label: "訪問周期", group: "設備" },
   { id: "points", label: "保安管理点数", numeric: true, group: "設備" },
 
+  { id: "contractType", label: "契約種別", group: "料金" },
   { id: "monthly", label: "月額", numeric: true, group: "料金" },
   { id: "annual", label: "年額", numeric: true, group: "料金" },
   {
@@ -100,4 +103,18 @@ export const AVAILABILITY_LABEL: Record<
   weekday: "平日のみ",
   holiday: "休日のみ",
   any: "いつでも可",
+};
+
+/** 契約種別の表示名 */
+export const CONTRACT_TYPE_LABEL: Record<ContractType, string> = {
+  hoan: "保安管理契約",
+  annual: "保安管理契約外（年次請け）",
+  other: "その他",
+};
+
+/** 一覧の狭い列に収めるための短い表示名 */
+export const CONTRACT_TYPE_SHORT: Record<ContractType, string> = {
+  hoan: "保安管理",
+  annual: "年次請け",
+  other: "その他",
 };

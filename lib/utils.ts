@@ -79,7 +79,9 @@ export function summarizeFacility(
   unit: string | null | undefined,
 ): string {
   const name = categoryName ?? "—";
-  if (capacity == null || unit == null || unit === "none") return name;
+  if (capacity == null) return name;
+  // 単位を持たない区分でも、控えの容量が入っていれば数字だけ添える
+  if (unit == null || unit === "none") return `${name} ${formatNumber(capacity)}`;
   return `${name} ${formatNumber(capacity)}${unit}`;
 }
 

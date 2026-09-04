@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { Button, Card, CardHeader, Input } from "@/components/ui";
 import { downloadFile, toCsv } from "@/lib/csv";
 import { useStore } from "@/lib/store/context";
+import { renameCustomerCodePrefix } from "@/lib/store/mutations";
 import { parseDocument } from "@/lib/store/seed";
 import { getCustomerViews } from "@/lib/store/selectors";
 import { formatDateTime, summarizeFacility, todayIso } from "@/lib/utils";
@@ -11,10 +12,39 @@ import { DriveConnection } from "./drive-connection";
 
 /** データ管理：書き出しと取り込み */
 export function DataManagement() {
-  const { doc, indexes, replace } = useStore();
+  const { doc, indexes, replace, updateWith } = useStore();
   const fileRef = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [prefixFrom, setPrefixFrom] = useState("");
+  const [prefixTo, setPrefixTo] = useState("");
+  const [prefixMessage, setPrefixMessage] = useState<string | null>(null);
+
+  // 実行前に、いくつ変わるのかを見せる
+  const prefixHits = prefixFrom.trim()
+    ? doc.customers.filter((c) => c.code.startsWith(prefixFrom.trim()))
+    : [];
+
+  const applyPrefix = () => {
+    setPrefixMessage(null);
+    const result = updateWith((d) => {
+      const r = renameCustomerCodePrefix(d, prefixFrom, prefixTo);
+      return { doc: r.doc, result: r.result };
+    });
+
+    if (result.renamed === 0 && result.skipped.length === 0) {
+      setPrefixMessage("該当する顧客IDがありませんでした。");
+      return;
+    }
+    const skipped = result.skipped.length
+      ? `　同じ顧客IDが既にあるため、${result.skipped
+          .map((s) => s.code)
+          .join("、")} は変えていません。`
+      : "";
+    setPrefixMessage(`${result.renamed} 件の顧客IDを変えました。${skipped}`);
+    setPrefixFrom("");
+    setPrefixTo("");
+  };
 
   const views = getCustomerViews(doc, indexes);
   const nameOf = (id: number) => views.find((v) => v.id === id);
@@ -171,6 +201,58 @@ export function DataManagement() {
           {error && (
             <p className="text-xs text-danger" role="alert">
               {error}
+            </p>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="顧客IDの接頭辞をまとめて変える"
+          description="「Ch01 → Zch01」のように、採番の決め方を変えたときの引っ越しに使います。点検実績や請求実績は顧客IDではなく内部の紐づけで持っているので、切れません"
+        />
+        <div className="space-y-2 p-4">
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="mb-1 block text-xs text-muted">いまの接頭辞</label>
+              <Input
+                value={prefixFrom}
+                onChange={(e) => setPrefixFrom(e.target.value)}
+                placeholder="Ch"
+                className="w-32"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">新しい接頭辞</label>
+              <Input
+                value={prefixTo}
+                onChange={(e) => setPrefixTo(e.target.value)}
+                placeholder="Zch"
+                className="w-32"
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={prefixHits.length === 0 || prefixTo.trim() === ""}
+              onClick={applyPrefix}
+            >
+              {prefixHits.length} 件を変える
+            </Button>
+          </div>
+
+          {prefixHits.length > 0 && prefixTo.trim() !== "" && (
+            <p className="text-xs text-muted">
+              例：{prefixHits[0].code} →{" "}
+              <span className="font-medium text-ink">
+                {prefixTo.trim() + prefixHits[0].code.slice(prefixFrom.trim().length)}
+              </span>
+              {prefixHits.length > 1 && ` ほか ${prefixHits.length - 1} 件`}
+            </p>
+          )}
+          {prefixMessage && (
+            <p className="text-xs text-ok" role="status">
+              {prefixMessage}
             </p>
           )}
         </div>

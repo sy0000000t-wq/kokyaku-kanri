@@ -292,6 +292,64 @@ export function suggestCustomerCode(
   return base;
 }
 
+export type CodePrefixResult = {
+  /** 置き換えた件数 */
+  renamed: number;
+  /** 置き換え後の顧客IDが既にある顧客とぶつかるので、触らなかったもの */
+  skipped: { code: string; name: string }[];
+};
+
+/**
+ * 顧客IDの接頭辞をまとめて付け替える。
+ * 「Ch01 → Zch01」のように、採番の決め方を変えたときの引っ越しに使う。
+ * 実績は顧客の内部IDで紐づいているので、顧客IDを変えても実績は切れない。
+ */
+export function renameCustomerCodePrefix(
+  doc: AppDocument,
+  from: string,
+  to: string,
+): { doc: AppDocument; result: CodePrefixResult } {
+  const before = from.trim();
+  const after = to.trim();
+  if (before === "" || before === after) {
+    return { doc, result: { renamed: 0, skipped: [] } };
+  }
+
+  const targets = doc.customers.filter((c) => c.code.startsWith(before));
+  // 置き換えないものの顧客IDは、そのままぶつかる相手になる
+  const taken = new Set(
+    doc.customers.filter((c) => !c.code.startsWith(before)).map((c) => c.code),
+  );
+
+  const skipped: CodePrefixResult["skipped"] = [];
+  const nextCode = new Map<number, string>();
+
+  for (const c of targets) {
+    const candidate = after + c.code.slice(before.length);
+    if (taken.has(candidate)) {
+      skipped.push({ code: c.code, name: c.name });
+      taken.add(c.code);
+      continue;
+    }
+    taken.add(candidate);
+    nextCode.set(c.id, candidate);
+  }
+
+  if (nextCode.size === 0) return { doc, result: { renamed: 0, skipped } };
+
+  return {
+    doc: touch({
+      ...doc,
+      customers: doc.customers.map((c) =>
+        nextCode.has(c.id)
+          ? { ...c, code: nextCode.get(c.id)!, updatedAt: new Date().toISOString() }
+          : c,
+      ),
+    }),
+    result: { renamed: nextCode.size, skipped },
+  };
+}
+
 /** 月の一覧を保存用の行にする。重複と範囲外を落とす */
 function monthRows(customerId: number, months: number[]) {
   return [...new Set(months)]
