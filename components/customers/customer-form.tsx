@@ -33,6 +33,7 @@ import type {
   FormMasters,
 } from "@/lib/customer-form-types";
 import { cn, formatKm, formatPoints, formatYen, MONTHS, todayIso } from "@/lib/utils";
+import type { ContractType } from "@/lib/store/document";
 
 export type { CustomerFormValues, FormMasters };
 
@@ -79,11 +80,11 @@ export function CustomerForm({
   );
   const [months, setMonths] = useState<number[]>(initial.inspectionMonths);
   const [billingMonths, setBillingMonths] = useState<number[]>(initial.billingMonths);
-  const [contractType, setContractType] = useState<"hoan" | "external">(
+  const [contractType, setContractType] = useState<ContractType>(
     initial.contractType,
   );
-  // 料金の積み方と請求の対象期間は、契約種別ひとつで決まる
-  const isExternal = contractType === "external";
+  // 料金の積み方・請求の対象期間・顧客IDの付け方は、契約種別ひとつで決まる
+  const isExternal = contractType !== "hoan";
   const [dirty, setDirty] = useState(false);
   // 顧客IDは契約年月日から作る。手で書き換えたら以後は追随させない
   const [codeEdited, setCodeEdited] = useState(initial.id != null);
@@ -376,19 +377,33 @@ export function CustomerForm({
                 label="契約種別"
                 className="sm:col-span-2"
                 hint={
-                  isExternal
-                    ? "1回あたりの金額 × 実施回数で年額を出し、実施した月をその月に請求します"
-                    : "月額 × 12ヶ月で年額を出し、請求は対象期間の最終月にまとめます"
+                  contractType === "hoan"
+                    ? "月額 × 12ヶ月で年額を出し、請求は対象期間の最終月にまとめます。顧客IDは Ho＋契約年月日"
+                    : contractType === "annual"
+                      ? "1回あたりの金額 × 実施回数で年額を出し、実施した月をその月に請求します。顧客IDは Ne＋契約年月日"
+                      : "金額と請求は年次請けと同じ扱いです。顧客IDは決まった形がないので自分で決めます"
                 }
               >
                 <Select
                   value={contractType}
-                  onChange={(e) =>
-                    setContractType(e.target.value as "hoan" | "external")
-                  }
+                  onChange={(e) => {
+                    const next = e.target.value as ContractType;
+                    setContractType(next);
+                    // 顧客IDを手で決めていなければ、接頭辞も付け替える
+                    if (!codeEdited) {
+                      const suggested = suggestCustomerCode(
+                        doc,
+                        contractStartDate,
+                        next,
+                        initial.id,
+                      );
+                      setFields((prev) => ({ ...prev, code: suggested }));
+                    }
+                  }}
                 >
                   <option value="hoan">保安管理契約</option>
-                  <option value="external">保安管理契約外</option>
+                  <option value="annual">保安管理契約外（年次請け）</option>
+                  <option value="other">その他</option>
                 </Select>
               </Field>
 
@@ -587,7 +602,12 @@ export function CustomerForm({
                     presetBillingMonths(Number(fields.billingCycleId), next);
                     // 顧客IDを手で決めていなければ、契約年月日に合わせる
                     if (!codeEdited) {
-                      const suggested = suggestCustomerCode(doc, next, initial.id);
+                      const suggested = suggestCustomerCode(
+                        doc,
+                        next,
+                        contractType,
+                        initial.id,
+                      );
                       if (suggested) {
                         setFields((prev) => ({ ...prev, code: suggested }));
                       }

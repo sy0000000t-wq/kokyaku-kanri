@@ -9,6 +9,7 @@ import {
   type CoefficientRow,
   type Customer,
   type CustomerFacility,
+  customerCodePrefix,
   type ContractType,
   type EquipmentCategory,
   type InspectionCycle,
@@ -267,12 +268,17 @@ export function updateDistance(
 export function suggestCustomerCode(
   doc: AppDocument,
   contractStartDate: string,
+  contractType: ContractType,
   excludeId: number | null = null,
 ): string {
+  // 「その他」は決まった形がないので、自分で決めてもらう
+  const prefix = customerCodePrefix(contractType);
+  if (prefix === null) return "";
+
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(contractStartDate ?? "");
   if (!m) return "";
 
-  const base = `${m[1].slice(2)}${m[2]}${m[3]}`;
+  const base = `${prefix}${m[1].slice(2)}${m[2]}${m[3]}`;
   const taken = new Set(
     doc.customers.filter((c) => c.id !== excludeId).map((c) => c.code),
   );

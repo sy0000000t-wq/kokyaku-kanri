@@ -22,7 +22,7 @@ export default function NewCustomerPage() {
       </div>
       <CustomerForm
         masters={masters}
-        initial={emptyCustomer(masters, suggestCustomerCode(doc, todayIso()))}
+        initial={emptyCustomer(masters, suggestCustomerCode(doc, todayIso(), "hoan"))}
       />
     </div>
   );

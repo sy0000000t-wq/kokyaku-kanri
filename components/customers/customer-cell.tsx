@@ -73,7 +73,7 @@ export function CustomerCell({
           {formatYen(
             showTaxIncluded ? c.pricing.monthlyIncl : c.pricing.monthlyExcl,
           )}
-          {c.contractType === "external" && (
+          {c.contractType !== "hoan" && (
             <div className="text-[11px] whitespace-nowrap text-muted">
               {formatYen(
                 showTaxIncluded ? c.pricing.visitFeeIncl : c.pricing.visitFeeExcl,

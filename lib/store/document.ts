@@ -19,24 +19,34 @@ export type CapacityUnit = "kVA" | "kW" | "none";
 export type CalculationMethod = "table" | "fixed" | "excluded";
 export type CategoryGroup = "demand" | "generation" | "other";
 /**
- * 契約の種類。料金の積み方と請求の対象期間は、これひとつで決まる。
+ * 契約の種類。料金の積み方・請求の対象期間・顧客IDの付け方が、これひとつで決まる。
  *
- * hoan     … 保安管理契約。月額 × 12ヶ月、請求は前回請求の翌月から当月まで
- * external … 保安管理契約外。1回あたり × 実施回数、請求は当月分のみ
- *
- * 保安管理契約外は、年次点検だけを請ける仕事や、
- * 実施月・請求月が周期どおりに来ない物件を指す。
+ * hoan   … 保安管理契約。月額 × 12ヶ月、請求は前回請求の翌月から当月まで。ID は Ho+契約年月日
+ * annual … 保安管理契約外の年次請け。1回あたり × 実施回数、請求は当月分のみ。ID は Ne+契約年月日
+ * other  … その他。金額と請求は年次請けと同じ扱いで、ID は自分で決める
  */
-export type ContractType = "hoan" | "external";
+export type ContractType = "hoan" | "annual" | "other";
+
+/** 契約種別ごとの顧客IDの接頭辞。null なら自動採番しない */
+export function customerCodePrefix(contractType: ContractType): string | null {
+  if (contractType === "hoan") return "Ho";
+  if (contractType === "annual") return "Ne";
+  return null;
+}
+
+/** 保安管理契約かどうか。それ以外は1回あたり・当月分のみで扱う */
+export function isHoanContract(contractType: ContractType): boolean {
+  return contractType === "hoan";
+}
 
 /** 契約種別から料金の決め方を決める */
 export function feeBasisOf(contractType: ContractType): FeeBasis {
-  return contractType === "external" ? "perVisit" : "monthly";
+  return isHoanContract(contractType) ? "monthly" : "perVisit";
 }
 
 /** 契約種別から請求の対象期間を決める */
 export function billingCoverageOf(contractType: ContractType): BillingCoverage {
-  return contractType === "external" ? "single" : "period";
+  return isHoanContract(contractType) ? "period" : "single";
 }
 
 /**

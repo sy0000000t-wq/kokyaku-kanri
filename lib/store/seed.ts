@@ -190,18 +190,20 @@ export function parseDocument(raw: unknown): AppDocument {
       switchgearRequestNote: c.switchgearRequestNote ?? "",
       // これまでは期間ぶんをまとめる前提だったので、既定はそのまま
       // 料金の積み方と請求の対象期間は、契約種別ひとつにまとめた
-      contractType:
-        c.contractType ??
-        (() => {
-          // 以前は料金の決め方と請求の対象期間を別々に持っていた
-          const old = c as unknown as {
-            feeBasis?: string;
-            billingCoverage?: string;
-          };
-          return old.feeBasis === "perVisit" || old.billingCoverage === "single"
-            ? ("external" as const)
-            : ("hoan" as const);
-        })(),
+      contractType: (() => {
+        // 以前は保安管理契約外をひとまとめに external と呼んでいた
+        if (c.contractType === ("external" as string)) return "annual" as const;
+        if (c.contractType) return c.contractType;
+
+        // さらに前は料金の決め方と請求の対象期間を別々に持っていた
+        const old = c as unknown as {
+          feeBasis?: string;
+          billingCoverage?: string;
+        };
+        return old.feeBasis === "perVisit" || old.billingCoverage === "single"
+          ? ("annual" as const)
+          : ("hoan" as const);
+      })(),
     })),
     // 設備ごとの点検開始月は後から足したので、無ければ顧客に合わせる（null）
     customerFacilities: (list("customerFacilities") as AppDocument["customerFacilities"]).map(

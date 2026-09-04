@@ -2,6 +2,7 @@ import type { CoefficientRowLike } from "@/lib/calc/coefficient";
 import { generateCycleMonths } from "@/lib/calc/schedule";
 import { todayIso } from "@/lib/utils";
 import { generateBillingMonths } from "@/lib/calc/billing";
+import type { ContractType } from "@/lib/store/document";
 
 export type FormCategoryCycle = {
   id: number;
@@ -57,7 +58,7 @@ export type CustomerFormValues = {
   inspectionCycleId: number;
   monthlyFee: number;
   monthlyFeeTaxMode: "excluded" | "included";
-  contractType: "hoan" | "external";
+  contractType: ContractType;
   annualFeeHandling: "included" | "separate";
   annualInspectionFee: number | null;
   annualFeeTaxMode: "excluded" | "included";
@@ -127,7 +128,7 @@ export function emptyCustomer(
     inspectionCycleId: cycle?.id ?? 0,
     monthlyFee: 0,
     monthlyFeeTaxMode: "excluded",
-    contractType: "hoan",
+    contractType: "hoan" as const,
     annualFeeHandling: "included",
     annualInspectionFee: null,
     annualFeeTaxMode: "excluded",

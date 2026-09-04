@@ -29,7 +29,11 @@ import {
 import { validateCustomer } from "@/lib/store/validation";
 import type { AppDocument } from "@/lib/store/document";
 import { getInspectionTarget } from "@/lib/calc/schedule";
-import { billingCoverageOf, feeBasisOf } from "@/lib/store/document";
+import {
+  billingCoverageOf,
+  customerCodePrefix,
+  feeBasisOf,
+} from "@/lib/store/document";
 import { parseDocument } from "@/lib/store/seed";
 
 function categoryCycle(doc: AppDocument, categoryName: string, cycleName: string) {
@@ -194,32 +198,53 @@ describe("saveCustomer", () => {
   });
 });
 
-describe("suggestCustomerCode（契約年月日から作る）", () => {
-  it("契約年月日を YYMMDD にする", () => {
+describe("suggestCustomerCode（契約種別＋契約年月日から作る）", () => {
+  it("保安管理契約は Ho＋契約年月日", () => {
     const doc = createInitialDocument();
-    expect(suggestCustomerCode(doc, "2026-03-01")).toBe("260301");
-    expect(suggestCustomerCode(doc, "2026-12-25")).toBe("261225");
+    expect(suggestCustomerCode(doc, "2026-03-01", "hoan")).toBe("Ho260301");
+    expect(suggestCustomerCode(doc, "2026-12-25", "hoan")).toBe("Ho261225");
+  });
+
+  it("年次請けは Ne＋契約年月日", () => {
+    const doc = createInitialDocument();
+    expect(suggestCustomerCode(doc, "2026-03-01", "annual")).toBe("Ne260301");
+  });
+
+  it("その他は自動採番しない（自分で決める）", () => {
+    const doc = createInitialDocument();
+    expect(suggestCustomerCode(doc, "2026-03-01", "other")).toBe("");
   });
 
   it("同じ日に複数あるときは a, b, c… を付ける", () => {
     const doc = createInitialDocument();
-    const { doc: one } = saveCustomer(doc, input(doc, { code: "260301" }));
-    expect(suggestCustomerCode(one, "2026-03-01")).toBe("260301a");
+    const { doc: one } = saveCustomer(doc, input(doc, { code: "Ho260301" }));
+    expect(suggestCustomerCode(one, "2026-03-01", "hoan")).toBe("Ho260301a");
 
-    const { doc: two } = saveCustomer(one, input(one, { code: "260301a" }));
-    expect(suggestCustomerCode(two, "2026-03-01")).toBe("260301b");
+    const { doc: two } = saveCustomer(one, input(one, { code: "Ho260301a" }));
+    expect(suggestCustomerCode(two, "2026-03-01", "hoan")).toBe("Ho260301b");
+  });
+
+  it("接頭辞が違えば同じ日でも枝番は付かない", () => {
+    const doc = createInitialDocument();
+    const { doc: one } = saveCustomer(doc, input(doc, { code: "Ho260301" }));
+    expect(suggestCustomerCode(one, "2026-03-01", "annual")).toBe("Ne260301");
   });
 
   it("自分自身の顧客IDは重複とみなさない（編集中）", () => {
     const doc = createInitialDocument();
-    const { doc: saved, customerId } = saveCustomer(doc, input(doc, { code: "260301" }));
-    expect(suggestCustomerCode(saved, "2026-03-01", customerId)).toBe("260301");
+    const { doc: saved, customerId } = saveCustomer(
+      doc,
+      input(doc, { code: "Ho260301" }),
+    );
+    expect(suggestCustomerCode(saved, "2026-03-01", "hoan", customerId)).toBe(
+      "Ho260301",
+    );
   });
 
   it("日付が無ければ候補を出さない", () => {
     const doc = createInitialDocument();
-    expect(suggestCustomerCode(doc, "")).toBe("");
-    expect(suggestCustomerCode(doc, "not-a-date")).toBe("");
+    expect(suggestCustomerCode(doc, "", "hoan")).toBe("");
+    expect(suggestCustomerCode(doc, "not-a-date", "hoan")).toBe("");
   });
 });
 
@@ -900,9 +925,18 @@ describe("契約種別", () => {
     expect(billingCoverageOf("hoan")).toBe("period");
   });
 
-  it("保安管理契約外は1回あたりで、請求は当月分のみ", () => {
-    expect(feeBasisOf("external")).toBe("perVisit");
-    expect(billingCoverageOf("external")).toBe("single");
+  it("年次請けもその他も1回あたりで、請求は当月分のみ", () => {
+    for (const type of ["annual", "other"] as const) {
+      expect(feeBasisOf(type)).toBe("perVisit");
+      expect(billingCoverageOf(type)).toBe("single");
+    }
+  });
+
+  it("顧客IDの接頭辞は契約種別で決まる", () => {
+    expect(customerCodePrefix("hoan")).toBe("Ho");
+    expect(customerCodePrefix("annual")).toBe("Ne");
+    // その他は決まった形がないので自動採番しない
+    expect(customerCodePrefix("other")).toBeNull();
   });
 
   it("設備区分「保安管理契約外」は換算係数の対象外として用意される", () => {
@@ -948,6 +982,18 @@ describe("契約種別", () => {
     };
 
     const parsed = parseDocument(JSON.parse(JSON.stringify(legacy)));
-    expect(parsed.customers[0].contractType).toBe("external");
+    expect(parsed.customers[0].contractType).toBe("annual");
+  });
+
+  it("ひとまとめだった external は年次請けとして引き継がれる", () => {
+    const base = createInitialDocument();
+    const { doc: saved } = saveCustomer(base, input(base));
+    const legacy = {
+      ...saved,
+      customers: saved.customers.map((c) => ({ ...c, contractType: "external" })),
+    };
+
+    const parsed = parseDocument(JSON.parse(JSON.stringify(legacy)));
+    expect(parsed.customers[0].contractType).toBe("annual");
   });
 });
