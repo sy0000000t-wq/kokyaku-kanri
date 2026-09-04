@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui";
 import {
   AVAILABILITY_LABEL,
-  CONTRACT_TYPE_SHORT,
+  CONTRACT_TYPE_LABEL,
   type ColumnId,
 } from "@/lib/customer-columns";
 import type { CustomerView } from "@/lib/store/selectors";
@@ -33,9 +33,13 @@ export function CustomerCell({
 
   switch (column) {
     case "contractType":
+      // 呼び方は編集画面と揃える。長いので折り返しを許す
       return (
-        <Badge tone={c.contractType === "hoan" ? "brand" : "neutral"}>
-          {CONTRACT_TYPE_SHORT[c.contractType]}
+        <Badge
+          tone={c.contractType === "hoan" ? "brand" : "neutral"}
+          className="whitespace-normal"
+        >
+          {CONTRACT_TYPE_LABEL[c.contractType]}
         </Badge>
       );
 

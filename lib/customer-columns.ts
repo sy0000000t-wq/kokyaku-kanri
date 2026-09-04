@@ -111,10 +111,3 @@ export const CONTRACT_TYPE_LABEL: Record<ContractType, string> = {
   annual: "保安管理契約外（年次請け）",
   other: "その他",
 };
-
-/** 一覧の狭い列に収めるための短い表示名 */
-export const CONTRACT_TYPE_SHORT: Record<ContractType, string> = {
-  hoan: "保安管理",
-  annual: "年次請け",
-  other: "その他",
-};
