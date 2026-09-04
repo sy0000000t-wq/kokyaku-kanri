@@ -28,6 +28,7 @@ export type Indexes = {
   categoryCyclesByCategory: Map<number, CategoryCycle[]>;
   facilitiesByCustomer: Map<number, CustomerFacility[]>;
   inspectionMonthsByCustomer: Map<number, number[]>;
+  billingMonthsByCustomer: Map<number, number[]>;
 };
 
 export function buildIndexes(doc: AppDocument): Indexes {
@@ -60,11 +61,20 @@ export function buildIndexes(doc: AppDocument): Indexes {
   }
   for (const list of inspectionMonthsByCustomer.values()) list.sort((a, b) => a - b);
 
+  const billingMonthsByCustomer = new Map<number, number[]>();
+  for (const m of doc.customerBillingMonths) {
+    const list = billingMonthsByCustomer.get(m.customerId) ?? [];
+    list.push(m.month);
+    billingMonthsByCustomer.set(m.customerId, list);
+  }
+  for (const list of billingMonthsByCustomer.values()) list.sort((a, b) => a - b);
+
   return {
     coefficientRowsByTable,
     categoryCyclesByCategory,
     facilitiesByCustomer,
     inspectionMonthsByCustomer,
+    billingMonthsByCustomer,
   };
 }
 
@@ -179,12 +189,7 @@ export function buildCustomerView(
     unitPriceOverride: customer.unitPriceOverride,
   });
 
-  const startMonth = parseYearMonth(customer.contractStartDate)?.month ?? 1;
-  // 請求は対象期間の最終月に行う（隔月なら2ヶ月分をまとめて2ヶ月目に請求）
-  const billingMonths = generateBillingMonths(
-    startMonth,
-    billingCycle?.intervalMonths ?? 1,
-  );
+  const billingMonths = indexes.billingMonthsByCustomer.get(customer.id) ?? [];
 
   return {
     ...customer,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatBilledMonths } from "@/lib/calc/billing";
 import { useStore } from "@/lib/store/context";
 import { setBilled, setBillingAmount, setPaid } from "@/lib/store/mutations";
 import { cn, formatYen } from "@/lib/utils";
@@ -141,7 +142,7 @@ export function BillingBox({
     <div className={cn("rounded px-1 py-1", isBilled && "bg-brand-soft")}>
       {coveredMonths && coveredMonths.length > 1 && (
         <div className="text-center text-[10px] leading-tight text-muted">
-          {coveredMonths.join("・")}月分
+          {formatBilledMonths(coveredMonths)}
         </div>
       )}
       <div className="flex items-center gap-1">
@@ -179,7 +180,7 @@ export function PaymentBox({
       )}
     >
       <div className="text-center text-[10px] leading-tight text-muted">
-        {coveredMonths.join("・")}月分 入金
+        {formatBilledMonths(coveredMonths)} 入金
       </div>
       <div className="flex items-center gap-1">
         <span className="tabular flex-1 text-right text-xs text-muted">

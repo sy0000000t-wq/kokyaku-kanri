@@ -140,6 +140,8 @@ export function buildBillingGrid(
       ym,
     );
 
+    const coveredMonths = billedMonths(customer.billingMonths, ym.month);
+
     const defaultAmount = calcDefaultBillingAmount({
       monthlyIncl: customer.pricing.monthlyIncl,
       annualFeeHandling: customer.annualFeeHandling,
@@ -147,7 +149,7 @@ export function buildBillingGrid(
       annualInspectionMonth: customer.annualInspectionMonth,
       targetMonth: ym.month,
       // 隔月・3ヶ月請求などは、その回でまとめて請求する
-      billingIntervalMonths: customer.billingCycle?.intervalMonths ?? 1,
+      coveredMonthCount: coveredMonths.length,
     });
 
     const record = allRecords.get(`${customer.id}:${ym.year}:${ym.month}`) ?? null;
@@ -163,7 +165,7 @@ export function buildBillingGrid(
       year: ym.year,
       month: ym.month,
       isTarget,
-      coveredMonths: billedMonths(ym.month, customer.billingCycle?.intervalMonths ?? 1),
+      coveredMonths,
       amount: record?.billingAmount ?? defaultAmount,
       defaultAmount,
       isBilled,

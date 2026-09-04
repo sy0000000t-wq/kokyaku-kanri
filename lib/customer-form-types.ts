@@ -1,6 +1,7 @@
 import type { CoefficientRowLike } from "@/lib/calc/coefficient";
 import { generateCycleMonths } from "@/lib/calc/schedule";
 import { todayIso } from "@/lib/utils";
+import { generateBillingMonths } from "@/lib/calc/billing";
 
 export type FormCategoryCycle = {
   id: number;
@@ -84,6 +85,7 @@ export type CustomerFormValues = {
   isActive: number;
   note: string;
   inspectionMonths: number[];
+  billingMonths: number[];
   facilities: FacilityFormValue[];
 };
 
@@ -151,6 +153,10 @@ export function emptyCustomer(
     paymentLagMonths: 1,
     isActive: 1,
     note: "",
+    billingMonths: generateBillingMonths(
+      now.getMonth() + 1,
+      masters.billingCycles[0]?.intervalMonths ?? 1,
+    ),
     inspectionMonths: generateCycleMonths(
       now.getMonth() + 1,
       cycle?.intervalMonths ?? 1,

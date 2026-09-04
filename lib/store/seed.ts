@@ -4,6 +4,8 @@ import {
   seedEquipmentCategories,
   seedInspectionCycles,
 } from "@/db/seed-data";
+import { generateBillingMonths } from "@/lib/calc/billing";
+import { parseYearMonth } from "@/lib/calc/schedule";
 import type { AppDocument } from "./document";
 
 /** 年次点検だけを請ける契約を表す設備区分の名前 */
@@ -111,6 +113,7 @@ export function createInitialDocument(): AppDocument {
     customers: [],
     customerFacilities: [],
     customerInspectionMonths: [],
+    customerBillingMonths: [],
     inspectionRecords: [],
     billingRecords: [],
     monthlyFocus: [],
@@ -189,6 +192,13 @@ export function parseDocument(raw: unknown): AppDocument {
       (f) => ({ ...f, startMonth: f.startMonth ?? null }),
     ),
     customerInspectionMonths: list("customerInspectionMonths"),
+    // 請求月は後から持つようにしたので、無ければ請求サイクルから起こす
+    customerBillingMonths: Array.isArray(d.customerBillingMonths)
+      ? (d.customerBillingMonths as AppDocument["customerBillingMonths"])
+      : billingMonthsFromCycle(
+          list("customers") as AppDocument["customers"],
+          list("billingCycles") as AppDocument["billingCycles"],
+        ),
     // 報告書提出と応援依頼は後から足したので、既定値を補う
     inspectionRecords: (list("inspectionRecords") as AppDocument["inspectionRecords"]).map(
       (r) => ({
@@ -281,4 +291,21 @@ function withAnnualSubcontract(
       ];
 
   return { equipmentCategories: nextCategories, categoryCycles: nextCycles };
+}
+
+/**
+ * 請求月を持っていない古いデータのために、
+ * 契約開始月と請求サイクルから、これまでと同じ請求月を起こす。
+ */
+function billingMonthsFromCycle(
+  customers: AppDocument["customers"],
+  billingCycles: AppDocument["billingCycles"],
+): AppDocument["customerBillingMonths"] {
+  return customers.flatMap((c) => {
+    const cycle = billingCycles.find((b) => b.id === c.billingCycleId);
+    const startMonth = parseYearMonth(c.contractStartDate)?.month ?? 1;
+    return generateBillingMonths(startMonth, cycle?.intervalMonths ?? 1).map(
+      (month) => ({ customerId: c.id, month }),
+    );
+  });
 }

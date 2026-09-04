@@ -172,6 +172,15 @@ export type CustomerInspectionMonth = {
   month: number;
 };
 
+/**
+ * 請求する月。請求サイクルからプリセットするが、最終的な正はこちら。
+ * 保安管理契約以外の物件は、請求月が周期どおりに来ないことがある。
+ */
+export type CustomerBillingMonth = {
+  customerId: number;
+  month: number;
+};
+
 export type InspectionRecord = {
   id: number;
   customerId: number;
@@ -245,6 +254,7 @@ export type AppDocument = {
   customers: Customer[];
   customerFacilities: CustomerFacility[];
   customerInspectionMonths: CustomerInspectionMonth[];
+  customerBillingMonths: CustomerBillingMonth[];
   inspectionRecords: InspectionRecord[];
   billingRecords: BillingRecord[];
   monthlyFocus: MonthlyFocus[];

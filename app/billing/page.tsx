@@ -15,6 +15,7 @@ import { PeriodNav } from "@/components/period-nav";
 import { ScopeFilter } from "@/components/scope-filter";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
 import { useStore } from "@/lib/store/context";
+import { formatBilledMonths } from "@/lib/calc/billing";
 import { buildBillingGrid } from "@/lib/store/monthly";
 import { getCustomerViews } from "@/lib/store/selectors";
 import { resolvePeriod } from "@/lib/period";
@@ -104,8 +105,8 @@ function BillingPageInner() {
                     <th className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
                       物件名称
                     </th>
-                    <th className="w-28 px-2.5 py-2 text-left font-medium whitespace-nowrap">
-                      請求サイクル
+                    <th className="w-32 px-2.5 py-2 text-left font-medium">
+                      請求月
                     </th>
                     {MONTHS.map((m) => (
                       <th
@@ -146,8 +147,13 @@ function BillingPageInner() {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-2.5 py-1.5 text-xs whitespace-nowrap">
-                        {c.billingCycle?.name ?? "毎月"}
+                      {/* 請求サイクルはプリセットにすぎないので、実際の請求月を出す */}
+                      <td className="px-2.5 py-1.5 text-xs">
+                        {c.billingMonths.length === 0
+                          ? "—"
+                          : c.billingMonths.length === 12
+                            ? "毎月"
+                            : `${c.billingMonths.join("・")}月`}
                       </td>
                       {MONTHS.map((m) => {
                         const billing = cellFor(c, m);
@@ -292,7 +298,7 @@ function BillingPageInner() {
                           </Link>
                         </td>
                         <td className="px-2.5 py-2 text-xs text-muted">
-                          {cell.coveredMonths.join("・")}月分
+                          {formatBilledMonths(cell.coveredMonths)}
                         </td>
                         <td className="px-2.5 py-2">
                           <BillingAmount
@@ -372,7 +378,7 @@ function BillingPageInner() {
                           )}
                         </td>
                         <td className="px-2.5 py-2 text-xs text-muted">
-                          {cell.coveredMonths.join("・")}月分
+                          {formatBilledMonths(cell.coveredMonths)}
                         </td>
                         <td className="tabular px-2.5 py-2 text-xs">
                           {formatYearMonth(cell.year, cell.month)}

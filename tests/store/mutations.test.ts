@@ -76,6 +76,7 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
     isActive: 1,
     note: "",
     inspectionMonths: [1, 3, 5, 7, 9, 11],
+    billingMonths: [],
     facilities: [
       {
         id: null,
@@ -834,6 +835,7 @@ describe("年次点検のみの契約", () => {
       ...input(doc),
       inspectionCycleId: annualOnly.id,
       inspectionMonths: [],
+      billingMonths: [],
       annualInspectionMonth: 9,
     });
 
@@ -849,6 +851,7 @@ describe("年次点検のみの契約", () => {
       ...input(doc),
       inspectionCycleId: annualOnly.id,
       inspectionMonths: [],
+      billingMonths: [],
       annualInspectionMonth: null,
     });
 
@@ -862,6 +865,7 @@ describe("年次点検のみの契約", () => {
       ...input(doc),
       inspectionCycleId: annualOnly.id,
       inspectionMonths: [],
+      billingMonths: [],
       annualInspectionMonth: 9,
     });
 

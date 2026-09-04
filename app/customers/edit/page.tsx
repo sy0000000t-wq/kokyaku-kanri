@@ -89,6 +89,7 @@ function EditCustomerPageInner() {
           isActive: customer.isActive,
           note: customer.note,
           inspectionMonths: customer.inspectionMonths,
+          billingMonths: customer.billingMonths,
           facilities: customer.facilities.map((f) => ({
             uid: `db-${f.id}`,
             id: f.id,

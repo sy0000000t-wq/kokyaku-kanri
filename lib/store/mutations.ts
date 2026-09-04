@@ -71,6 +71,8 @@ export type CustomerInput = {
   isActive: number;
   note: string;
   inspectionMonths: number[];
+  /** 請求する月。請求サイクルのプリセットを手で直せる */
+  billingMonths: number[];
   facilities: FacilityInput[];
 };
 
@@ -161,9 +163,11 @@ export function saveCustomer(
       ],
       customerInspectionMonths: [
         ...doc.customerInspectionMonths.filter((m) => m.customerId !== customerId),
-        ...[...new Set(input.inspectionMonths)]
-          .filter((m) => m >= 1 && m <= 12)
-          .map((month) => ({ customerId, month })),
+        ...monthRows(customerId, input.inspectionMonths),
+      ],
+      customerBillingMonths: [
+        ...doc.customerBillingMonths.filter((m) => m.customerId !== customerId),
+        ...monthRows(customerId, input.billingMonths),
       ],
     }),
   };
@@ -200,6 +204,9 @@ export function deleteCustomer(doc: AppDocument, id: number): AppDocument {
     customerInspectionMonths: doc.customerInspectionMonths.filter(
       (m) => m.customerId !== id,
     ),
+    customerBillingMonths: doc.customerBillingMonths.filter(
+      (m) => m.customerId !== id,
+    ),
     inspectionRecords: doc.inspectionRecords.filter((r) => r.customerId !== id),
     billingRecords: doc.billingRecords.filter((r) => r.customerId !== id),
   });
@@ -212,6 +219,7 @@ export function extractCustomer(doc: AppDocument, id: number) {
     customer: doc.customers.find((c) => c.id === id) ?? null,
     facilities: doc.customerFacilities.filter((f) => f.customerId === id),
     inspectionMonths: doc.customerInspectionMonths.filter((m) => m.customerId === id),
+    billingMonths: doc.customerBillingMonths.filter((m) => m.customerId === id),
     inspectionRecords: doc.inspectionRecords.filter((r) => r.customerId === id),
     billingRecords: doc.billingRecords.filter((r) => r.customerId === id),
   };
@@ -273,6 +281,14 @@ export function suggestCustomerCode(
     if (!taken.has(candidate)) return candidate;
   }
   return base;
+}
+
+/** 月の一覧を保存用の行にする。重複と範囲外を落とす */
+function monthRows(customerId: number, months: number[]) {
+  return [...new Set(months)]
+    .filter((m) => m >= 1 && m <= 12)
+    .sort((a, b) => a - b)
+    .map((month) => ({ customerId, month }));
 }
 
 /* --------------------------------- 点検実績 --------------------------------- */

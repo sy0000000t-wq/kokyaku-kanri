@@ -31,18 +31,45 @@ export function generateBillingMonths(
 
 /**
  * その請求が何月分をまとめたものかを返す（古い順）。
- * 「3月4月分」のように画面へ出して、取り違えを防ぐために使う。
+ * 「3・4月分」のように画面へ出して、取り違えを防ぐために使う。
+ *
+ * 請求月は不規則でもよいので、間隔からではなく
+ * 「ひとつ前の請求月の翌月から、この請求月まで」で数える。
+ * 例）請求月 4・6・8・10・12・2月 のとき 4月請求は 3・4月分
+ *     請求月 12・3・6・9月 のとき 12月請求は 10・11・12月分
+ *     請求月が年1回なら、その月までの12ヶ月分
  */
 export function billedMonths(
+  billingMonths: number[],
   billingMonth: number,
-  intervalMonths: number,
 ): number[] {
-  const months = Math.max(1, Math.round(intervalMonths || 1));
-  const out: number[] = [];
-  for (let i = months - 1; i >= 0; i--) {
-    out.push(normalizeMonth(billingMonth - i));
-  }
-  return out;
+  const month = normalizeMonth(billingMonth);
+  const months = [...new Set(billingMonths.map(normalizeMonth))];
+
+  const span = (length: number) => {
+    const out: number[] = [];
+    for (let i = length - 1; i >= 0; i--) out.push(normalizeMonth(month - i));
+    return out;
+  };
+
+  // 請求月として登録されていない月は、その月だけを対象とみなす
+  if (!months.includes(month)) return span(1);
+  if (months.length === 1) return span(12);
+
+  // ひとつ前の請求月まで遡る
+  let gap = 1;
+  while (gap < 12 && !months.includes(normalizeMonth(month - gap))) gap += 1;
+  return span(gap);
+}
+
+/**
+ * 「何月分」の表示。
+ * 3ヶ月ぶんまでは並べ、それより長いときは範囲で書く（12ヶ月ぶんが並ぶと読めないため）。
+ */
+export function formatBilledMonths(coveredMonths: number[]): string {
+  if (coveredMonths.length === 0) return "";
+  if (coveredMonths.length <= 3) return `${coveredMonths.join("・")}月分`;
+  return `${coveredMonths[0]}〜${coveredMonths[coveredMonths.length - 1]}月分`;
 }
 
 export type BillingTargetInput = ContractLike & {
@@ -66,21 +93,18 @@ export type BillingAmountInput = {
   annualInspectionFeeIncl: number;
   annualInspectionMonth: number | null;
   targetMonth: number;
-  /**
-   * 請求サイクルの間隔（月）。隔月なら 2、3ヶ月なら 3。
-   * 毎月でない場合、その回で間隔ぶんをまとめて請求する。
-   */
-  billingIntervalMonths?: number;
+  /** この請求がまとめる月数。隔月なら 2、3ヶ月なら 3 */
+  coveredMonthCount?: number;
 };
 
 /**
  * 請求額の既定値。
  *
- * 月額 × 請求サイクルの月数 ＋（別途請求 かつ 年次点検月と同月なら）年次点検費。
+ * 月額 × まとめる月数 ＋（別途請求 かつ 年次点検月と同月なら）年次点検費。
  * 隔月請求なら1回の請求で2ヶ月分をまとめて請求するため、月額をそのまま出すと不足する。
  */
 export function calcDefaultBillingAmount(input: BillingAmountInput): number {
-  const months = Math.max(1, Math.round(input.billingIntervalMonths ?? 1));
+  const months = Math.max(1, Math.round(input.coveredMonthCount ?? 1));
 
   const annual =
     input.annualFeeHandling === "separate" &&

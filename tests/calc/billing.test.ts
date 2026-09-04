@@ -3,6 +3,7 @@ import {
   billedMonths,
   calcDefaultBillingAmount,
   calcExpectedPayment,
+  formatBilledMonths,
   generateBillingMonths,
   isBillingTarget,
   isPaymentOverdue,
@@ -36,7 +37,7 @@ describe("calcDefaultBillingAmount：請求サイクルぶんをまとめて請�
         annualInspectionFeeIncl: 0,
         annualInspectionMonth: null,
         targetMonth: 5,
-        billingIntervalMonths: 2,
+        coveredMonthCount: 2,
       }),
     ).toBe(38500);
   });
@@ -49,7 +50,7 @@ describe("calcDefaultBillingAmount：請求サイクルぶんをまとめて請�
         annualInspectionFeeIncl: 0,
         annualInspectionMonth: null,
         targetMonth: 6,
-        billingIntervalMonths: 3,
+        coveredMonthCount: 3,
       }),
     ).toBe(57750);
   });
@@ -62,7 +63,7 @@ describe("calcDefaultBillingAmount：請求サイクルぶんをまとめて請�
         annualInspectionFeeIncl: 0,
         annualInspectionMonth: null,
         targetMonth: 4,
-        billingIntervalMonths: 12,
+        coveredMonthCount: 12,
       }),
     ).toBe(231000);
   });
@@ -75,7 +76,7 @@ describe("calcDefaultBillingAmount：請求サイクルぶんをまとめて請�
         annualInspectionFeeIncl: 44000,
         annualInspectionMonth: 4,
         targetMonth: 4,
-        billingIntervalMonths: 2,
+        coveredMonthCount: 2,
       }),
     ).toBe(74800); // 15,400 × 2 + 44,000
   });
@@ -182,19 +183,19 @@ describe("請求月は対象期間の最終月（後払い）", () => {
 
 describe("billedMonths：その請求が何月分か", () => {
   it("隔月請求の4月は、3月と4月の2ヶ月分", () => {
-    expect(billedMonths(4, 2)).toEqual([3, 4]);
+    expect(billedMonths([2, 4, 6, 8, 10, 12], 4)).toEqual([3, 4]);
   });
 
   it("3ヶ月請求の12月は、10・11・12月分", () => {
-    expect(billedMonths(12, 3)).toEqual([10, 11, 12]);
+    expect(billedMonths([3, 6, 9, 12], 12)).toEqual([10, 11, 12]);
   });
 
   it("年をまたぐ場合も1〜12に収まる", () => {
-    expect(billedMonths(2, 3)).toEqual([12, 1, 2]);
+    expect(billedMonths([2, 5, 8, 11], 2)).toEqual([12, 1, 2]);
   });
 
   it("毎月請求はその月だけ", () => {
-    expect(billedMonths(7, 1)).toEqual([7]);
+    expect(billedMonths([1,2,3,4,5,6,7,8,9,10,11,12], 7)).toEqual([7]);
   });
 });
 
@@ -227,5 +228,43 @@ describe("請求と入金のスケジュール（本人の運用に合わせた�
       year: 2027,
       month: 4,
     });
+  });
+});
+
+describe("不規則な請求月", () => {
+  it("巡回のように間隔がそろわなくても、前回請求の翌月からを対象にする", () => {
+    // 5・8・11月に請求する契約
+    const months = [5, 8, 11];
+    expect(billedMonths(months, 5)).toEqual([12, 1, 2, 3, 4, 5]);
+    expect(billedMonths(months, 8)).toEqual([6, 7, 8]);
+    expect(billedMonths(months, 11)).toEqual([9, 10, 11]);
+  });
+
+  it("年1回の請求は、その月までの12ヶ月分", () => {
+    expect(billedMonths([2], 2)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2]);
+  });
+
+  it("請求月として登録していない月は、その月だけを対象にする", () => {
+    expect(billedMonths([5, 8, 11], 7)).toEqual([7]);
+  });
+
+  it("請求月が空なら、その月だけを対象にする", () => {
+    expect(billedMonths([], 7)).toEqual([7]);
+  });
+});
+
+describe("formatBilledMonths：何月分の表示", () => {
+  it("3ヶ月分までは並べる", () => {
+    expect(formatBilledMonths([3, 4])).toBe("3・4月分");
+    expect(formatBilledMonths([10, 11, 12])).toBe("10・11・12月分");
+  });
+
+  it("4ヶ月分以上は範囲で書く", () => {
+    expect(formatBilledMonths([12, 1, 2, 3, 4, 5])).toBe("12〜5月分");
+    expect(formatBilledMonths([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 1, 2])).toBe("3〜2月分");
+  });
+
+  it("空なら何も出さない", () => {
+    expect(formatBilledMonths([])).toBe("");
   });
 });

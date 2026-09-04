@@ -3,6 +3,7 @@ import { createInitialDocument } from "@/lib/store/seed";
 import { buildBillingGrid } from "@/lib/store/monthly";
 import { buildIndexes, getCustomerViews } from "@/lib/store/selectors";
 import type { AppDocument, Customer } from "@/lib/store/document";
+import { generateBillingMonths } from "@/lib/calc/billing";
 
 const TODAY = { year: 2026, month: 8 };
 
@@ -50,7 +51,16 @@ function customer(overrides: Partial<Customer> = {}): Customer {
 
 function setup(overrides: Partial<Customer>) {
   const doc: AppDocument = createInitialDocument();
-  doc.customers.push(customer(overrides));
+  const c = customer(overrides);
+  doc.customers.push(c);
+
+  // 請求月は顧客が持つ。ここでは請求サイクルどおりに置く
+  const cycle = doc.billingCycles.find((b) => b.id === c.billingCycleId);
+  const startMonth = Number(c.contractStartDate.slice(5, 7));
+  for (const month of generateBillingMonths(startMonth, cycle?.intervalMonths ?? 1)) {
+    doc.customerBillingMonths.push({ customerId: c.id, month });
+  }
+
   const view = getCustomerViews(doc, buildIndexes(doc))[0];
   return { doc, view };
 }

@@ -21,6 +21,11 @@ import {
   facilityResult,
 } from "@/components/customers/facility-rows";
 import { calcPricing } from "@/lib/calc/pricing";
+import {
+  billedMonths,
+  formatBilledMonths,
+  generateBillingMonths,
+} from "@/lib/calc/billing";
 import { generateCycleMonths, parseYearMonth } from "@/lib/calc/schedule";
 import type {
   CustomerFormValues,
@@ -73,6 +78,7 @@ export function CustomerForm({
     initial.switchgearRequestRequired === 1,
   );
   const [months, setMonths] = useState<number[]>(initial.inspectionMonths);
+  const [billingMonths, setBillingMonths] = useState<number[]>(initial.billingMonths);
   const [dirty, setDirty] = useState(false);
   // 顧客IDは契約年月日から作る。手で書き換えたら以後は追随させない
   const [codeEdited, setCodeEdited] = useState(initial.id != null);
@@ -156,6 +162,14 @@ export function CustomerForm({
     setMonths(generateCycleMonths(startMonth, c.intervalMonths));
   };
 
+  /** 請求サイクルから請求月をプリセットする（こちらも手修正が最終的な正） */
+  const presetBillingMonths = (cycleId: number | null, startDate: string) => {
+    const c = masters.billingCycles.find((x) => x.id === cycleId);
+    if (!c) return;
+    const startMonth = parseYearMonth(startDate)?.month ?? 1;
+    setBillingMonths(generateBillingMonths(startMonth, c.intervalMonths));
+  };
+
   // §9 未保存離脱時の確認
   useEffect(() => {
     if (!dirty) return;
@@ -204,6 +218,7 @@ export function CustomerForm({
       isActive: isActive ? 1 : 0,
       note: fields.note,
       inspectionMonths: months,
+      billingMonths,
       facilities: facilities.map((f) => ({
         id: f.id,
         categoryId: f.categoryId,
@@ -535,6 +550,7 @@ export function CustomerForm({
                     const next = e.target.value;
                     setContractStartDate(next);
                     presetMonths(inspectionCycleId, next);
+                    presetBillingMonths(Number(fields.billingCycleId), next);
                     // 顧客IDを手で決めていなければ、契約年月日に合わせる
                     if (!codeEdited) {
                       const suggested = suggestCustomerCode(doc, next, initial.id);
@@ -657,38 +673,11 @@ export function CustomerForm({
                     通常点検なし。年次点検だけを行う契約として扱い、点検スケジュールには年次点検だけが出ます。
                   </p>
                 )}
-                <div className="flex flex-wrap gap-1.5">
-                  {MONTHS.map((m) => {
-                    const checked = months.includes(m);
-                    return (
-                      <label
-                        key={m}
-                        className={cn(
-                          "flex h-9 w-12 cursor-pointer items-center justify-center rounded-md border text-sm transition-colors",
-                          checked
-                            ? "border-brand bg-brand-soft font-medium text-brand"
-                            : "border-line bg-surface text-muted hover:bg-canvas",
-                        )}
-                      >
-                        <input
-                          type="checkbox"
-                          name="inspectionMonths"
-                          value={m}
-                          checked={checked}
-                          onChange={(e) =>
-                            setMonths((prev) =>
-                              e.target.checked
-                                ? [...prev, m].sort((a, b) => a - b)
-                                : prev.filter((x) => x !== m),
-                            )
-                          }
-                          className="sr-only"
-                        />
-                        {m}月
-                      </label>
-                    );
-                  })}
-                </div>
+                <MonthPicker
+                  name="inspectionMonths"
+                  selected={months}
+                  onChange={setMonths}
+                />
               </Field>
             </div>
           </Card>
@@ -698,7 +687,14 @@ export function CustomerForm({
             <CardHeader title="請求設定" />
             <div className="grid gap-3 p-4 sm:grid-cols-2">
               <Field label="請求サイクル" hint="点検周期とは別に設定できます">
-                <Select name="billingCycleId" {...bind("billingCycleId")}>
+                <Select
+                  name="billingCycleId"
+                  value={fields.billingCycleId}
+                  onChange={(e) => {
+                    setFields((prev) => ({ ...prev, billingCycleId: e.target.value }));
+                    presetBillingMonths(Number(e.target.value), contractStartDate);
+                  }}
+                >
                   {masters.billingCycles.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
@@ -714,6 +710,23 @@ export function CustomerForm({
                   max="12"
                   {...bind("paymentLagMonths")}
                 />
+              </Field>
+
+              <Field
+                label="請求月"
+                className="sm:col-span-2"
+                hint="請求サイクルを選ぶとプリセットされます。不規則な契約はここで直接選べます"
+              >
+                <MonthPicker
+                  name="billingMonths"
+                  selected={billingMonths}
+                  onChange={setBillingMonths}
+                />
+                <p className="mt-1.5 text-xs text-muted">
+                  {billingMonths.length === 0
+                    ? "請求月がありません。請求・入金には出てきません。"
+                    : `${describeBilling(billingMonths)}`}
+                </p>
               </Field>
             </div>
           </Card>
@@ -862,4 +875,57 @@ function DeleteButton({ id, name }: { id: number; name: string }) {
       </div>
     </div>
   );
+}
+
+/** 月を選ぶボタン列。点検の実施月と請求月で同じ見た目にする */
+function MonthPicker({
+  name,
+  selected,
+  onChange,
+}: {
+  name: string;
+  selected: number[];
+  onChange: (next: number[]) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {MONTHS.map((m) => {
+        const checked = selected.includes(m);
+        return (
+          <label
+            key={m}
+            className={cn(
+              "flex h-9 w-12 cursor-pointer items-center justify-center rounded-md border text-sm transition-colors",
+              checked
+                ? "border-brand bg-brand-soft font-medium text-brand"
+                : "border-line bg-surface text-muted hover:bg-canvas",
+            )}
+          >
+            <input
+              type="checkbox"
+              name={name}
+              value={m}
+              checked={checked}
+              onChange={(e) =>
+                onChange(
+                  e.target.checked
+                    ? [...selected, m].sort((a, b) => a - b)
+                    : selected.filter((x) => x !== m),
+                )
+              }
+              className="sr-only"
+            />
+            {m}月
+          </label>
+        );
+      })}
+    </div>
+  );
+}
+
+/** 「4月は3・4月分」のように、各請求が何月分になるかを1行で説明する */
+function describeBilling(billingMonths: number[]): string {
+  return billingMonths
+    .map((m) => `${m}月は${formatBilledMonths(billedMonths(billingMonths, m))}`)
+    .join(" ／ ");
 }
