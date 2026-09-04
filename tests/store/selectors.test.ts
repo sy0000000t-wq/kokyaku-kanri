@@ -89,7 +89,7 @@ describe("createInitialDocument", () => {
     const doc = createInitialDocument();
     expect(doc.coefficientTables).toHaveLength(2);
     expect(doc.coefficientRows).toHaveLength(24);
-    expect(doc.equipmentCategories).toHaveLength(11);
+    expect(doc.equipmentCategories).toHaveLength(12);
     expect(doc.inspectionCycles.length).toBeGreaterThan(0);
     expect(doc.billingCycles).toHaveLength(5);
     expect(doc.customers).toHaveLength(0);

@@ -729,12 +729,18 @@ export function CustomerForm({
                   key={facilities[i].uid}
                   label={f.category?.name ?? `設備 ${i + 1}`}
                 >
-                  <span className="text-xs text-muted">
-                    {f.result.multiplier != null && f.result.base != null
-                      ? `${f.result.base} × ${f.result.multiplier} =`
-                      : `${f.cycle?.name ?? ""} =`}
-                  </span>
-                  <span className="ml-1.5">{formatPoints(f.result.points)}</span>
+                  {f.category?.calculationMethod === "excluded" ? (
+                    <span className="text-xs text-muted">換算係数の対象外</span>
+                  ) : (
+                    <>
+                      <span className="text-xs text-muted">
+                        {f.result.multiplier != null && f.result.base != null
+                          ? `${f.result.base} × ${f.result.multiplier} =`
+                          : `${f.cycle?.name ?? ""} =`}
+                      </span>
+                      <span className="ml-1.5">{formatPoints(f.result.points)}</span>
+                    </>
+                  )}
                   {f.result.isOverridden && (
                     <Badge tone="warn" className="ml-1.5">
                       手動

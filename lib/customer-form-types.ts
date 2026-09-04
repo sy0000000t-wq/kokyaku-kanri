@@ -17,7 +17,7 @@ export type FormCategory = {
   name: string;
   categoryGroup: "demand" | "generation" | "other";
   capacityUnit: "kVA" | "kW" | "none";
-  calculationMethod: "table" | "fixed";
+  calculationMethod: "table" | "fixed" | "excluded";
   coefficientTableId: number | null;
   minCapacity: number | null;
   maxCapacity: number | null;

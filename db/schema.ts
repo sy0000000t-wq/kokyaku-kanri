@@ -60,7 +60,7 @@ export const equipmentCategories = sqliteTable("equipment_categories", {
   capacityUnit: text("capacity_unit", { enum: ["kVA", "kW", "none"] })
     .notNull()
     .default("kVA"),
-  calculationMethod: text("calculation_method", { enum: ["table", "fixed"] })
+  calculationMethod: text("calculation_method", { enum: ["table", "fixed", "excluded"] })
     .notNull()
     .default("table"),
   /** calculation_method = table のときに引く係数表 */

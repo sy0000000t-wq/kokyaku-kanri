@@ -10,7 +10,13 @@ export const DOCUMENT_VERSION = 2;
 
 export type DistanceMode = "auto" | "road" | "straight";
 export type CapacityUnit = "kVA" | "kW" | "none";
-export type CalculationMethod = "table" | "fixed";
+/**
+ * 点数の決め方。
+ * table  … 容量から換算係数を引き、周期ごとの倍率を掛ける
+ * fixed  … 周期ごとの固定点数をそのまま使う
+ * excluded … 換算係数を適用せず、保安管理点数にも算入しない（年次請けなど）
+ */
+export type CalculationMethod = "table" | "fixed" | "excluded";
 export type CategoryGroup = "demand" | "generation" | "other";
 export type AnnualFeeHandling = "included" | "separate";
 /** 入力した金額が税抜か税込か */

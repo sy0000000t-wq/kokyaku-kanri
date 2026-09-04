@@ -99,7 +99,9 @@ export function FacilityRows({
           row,
           masters,
         );
-        const needsCapacity = category?.capacityUnit !== "none";
+        // 換算係数の対象外。容量も係数も点数に効かないので出さない
+        const isExcluded = category?.calculationMethod === "excluded";
+        const needsCapacity = category?.capacityUnit !== "none" && !isExcluded;
         const isTable = category?.calculationMethod === "table";
 
         // 毎月の設備は訪問のたびに点検するので、開始月をずらす意味がない
@@ -137,8 +139,13 @@ export function FacilityRows({
                 設備 {index + 1}
               </span>
               <div className="flex items-center gap-2">
-                <span className="tabular text-sm font-semibold">
-                  {formatPoints(result.points)} 点
+                <span
+                  className={cn(
+                    "tabular text-sm font-semibold",
+                    isExcluded && "text-xs font-normal text-muted",
+                  )}
+                >
+                  {isExcluded ? "換算係数の対象外" : `${formatPoints(result.points)} 点`}
                 </span>
                 {facilities.length > 1 && (
                   <Button
@@ -352,10 +359,15 @@ export function FacilityRows({
               </div>
             </div>
 
+            {isExcluded && (
+              <p className="mt-2 text-xs text-muted">
+                この区分は換算係数を適用しません。保安管理点数には算入しません（0点）。
+              </p>
+            )}
             {category?.note && (
               <p className="mt-2 text-xs text-muted">{category.note}</p>
             )}
-            {result.points == null && (
+            {!isExcluded && result.points == null && (
               <p className="mt-2 text-xs text-warn">
                 {isTable
                   ? "容量が係数表のレンジ外です。係数表から選ぶか、数値を直接入力してください。"

@@ -248,3 +248,51 @@ function facilityPoints(
 ): number | null {
   return calcFacilityPoints(facility(categoryName, cycleName, capacity)).points;
 }
+
+describe("換算係数の対象外（年次請け）", () => {
+  it("容量や周期によらず 0 点", () => {
+    const result = calcFacilityPoints({
+      category: { calculationMethod: "excluded", capacityUnit: "none" },
+      cycle: { intervalMonths: 12 },
+      capacity: null,
+    });
+
+    expect(result.points).toBe(0);
+    expect(result.base).toBeNull();
+    expect(result.multiplier).toBeNull();
+  });
+
+  it("係数を手で指定しても効かない", () => {
+    const result = calcFacilityPoints({
+      category: { calculationMethod: "excluded", capacityUnit: "kVA" },
+      cycle: { intervalMonths: 12, multiplier: 0.6 },
+      capacity: 300,
+      coefficientOverride: 1.5,
+    });
+
+    expect(result.points).toBe(0);
+    expect(result.isOverridden).toBe(false);
+  });
+
+  it("合算しても保安管理点数は変わらない", () => {
+    const demand = {
+      category: {
+        calculationMethod: "table" as const,
+        capacityUnit: "kVA" as const,
+        rows: [{ minCapacity: 100, maxCapacity: null, coefficient: 1 }],
+      },
+      cycle: { intervalMonths: 2, multiplier: 0.6 },
+      capacity: 300,
+    };
+    const subcontract = {
+      category: { calculationMethod: "excluded" as const, capacityUnit: "none" as const },
+      cycle: { intervalMonths: 12 },
+      capacity: null,
+    };
+
+    const alone = calcSitePoints([demand]);
+    const withSubcontract = calcSitePoints([demand, subcontract]);
+
+    expect(withSubcontract.total).toBe(alone.total);
+  });
+});

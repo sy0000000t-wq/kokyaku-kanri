@@ -26,7 +26,7 @@ export function findBaseCoefficient(
 
 /** 設備区分（換算値算出フロー図の分岐） */
 export type CategoryLike = {
-  calculationMethod: "table" | "fixed";
+  calculationMethod: "table" | "fixed" | "excluded";
   capacityUnit: "kVA" | "kW" | "none";
   /** calculationMethod = "table" のときに引く係数表の行 */
   rows?: CoefficientRowLike[];
@@ -68,6 +68,7 @@ export type FacilityPointsResult = {
  *
  * - fixed 方式：周期ごとの固定点数をそのまま使う
  *   （低圧、64kVA未満、64〜100kVA、EV充電設備、配電線路のみ）
+ * - excluded 方式：換算係数を適用せず 0 点（年次請けなど、保安管理点数に入らないもの）
  * - table 方式：係数表から基準係数を引き、周期ごとの倍率を掛ける
  *   （100kVA超過、火力、太陽光、蓄電所）
  *
@@ -83,6 +84,17 @@ export function calcFacilityPoints(
     input.capacity != null &&
     ((category.minCapacity != null && input.capacity < category.minCapacity) ||
       (category.maxCapacity != null && input.capacity > category.maxCapacity));
+
+  // 換算係数の対象外。点数を持たないので合算しても総点数は変わらない
+  if (category.calculationMethod === "excluded") {
+    return {
+      base: null,
+      multiplier: null,
+      points: 0,
+      isOverridden: false,
+      capacityOutOfRange: false,
+    };
+  }
 
   if (category.calculationMethod === "fixed") {
     const fixed = cycle.fixedPoints;

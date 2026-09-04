@@ -83,7 +83,7 @@ export type SeedEquipmentCategory = {
   name: string;
   categoryGroup: "demand" | "generation" | "other";
   capacityUnit: "kVA" | "kW" | "none";
-  calculationMethod: "table" | "fixed";
+  calculationMethod: "table" | "fixed" | "excluded";
   table?: string | null;
   minCapacity?: number | null;
   maxCapacity?: number | null;
@@ -241,6 +241,15 @@ export const seedEquipmentCategories: SeedEquipmentCategory[] = [
     cycles: [
       { name: "（周期によらず固定）", intervalMonths: 1, fixedPoints: 0.1 },
     ],
+  },
+  {
+    // 年次点検だけを請ける仕事。保安管理業務ではないので換算係数を当てない
+    name: "年次請け",
+    categoryGroup: "other",
+    capacityUnit: "none",
+    calculationMethod: "excluded",
+    note: "年次点検だけを請ける契約。換算係数を適用せず、保安管理点数にも算入しません",
+    cycles: [{ name: "年1回", intervalMonths: 12 }],
   },
 ];
 

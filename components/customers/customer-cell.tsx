@@ -41,7 +41,10 @@ export function CustomerCell({
                 f.category?.capacityUnit,
               )}
               <span className="ml-1 text-muted">
-                / {f.cycle?.name ?? "—"} / {formatPoints(f.result.points)}点
+                / {f.cycle?.name ?? "—"} /{" "}
+                {f.category?.calculationMethod === "excluded"
+                  ? "対象外"
+                  : `${formatPoints(f.result.points)}点`}
               </span>
             </div>
           ))}

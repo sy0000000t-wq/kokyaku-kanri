@@ -178,7 +178,7 @@ function CategoryForm({
     <Card>
       <CardHeader
         title={category ? "区分の設定" : "新しい区分"}
-        description="係数表方式は「容量から係数を引いて倍率を掛ける」、固定方式は「周期ごとの固定点数」です"
+        description="係数表方式は「容量から係数を引いて倍率を掛ける」、固定方式は「周期ごとの固定点数」。年次請けのように保安管理点数に入らないものは「換算係数を適用しない」を選びます"
       />
       <form onSubmit={submit}>
         <div className="grid gap-3 p-4 sm:grid-cols-2">
@@ -200,10 +200,13 @@ function CategoryForm({
           <Field label="点数の決め方">
             <Select
               value={method}
-              onChange={(e) => setMethod(e.target.value as "table" | "fixed")}
+              onChange={(e) =>
+                setMethod(e.target.value as "table" | "fixed" | "excluded")
+              }
             >
               <option value="table">係数表 × 倍率</option>
               <option value="fixed">周期ごとの固定点数</option>
+              <option value="excluded">換算係数を適用しない（0点）</option>
             </Select>
           </Field>
 
@@ -298,9 +301,11 @@ function CycleList({
       <CardHeader
         title={`${category.name} の点検周期`}
         description={
-          isTable
-            ? "倍率は換算係数に掛ける値です（例：2ヶ月に1回 → 0.6）"
-            : "固定点数は容量によらずそのまま点数になります（例：3ヶ月に1回 → 0.2点）"
+          category.calculationMethod === "excluded"
+            ? "この区分は換算係数を適用しないので、周期は点数に影響しません（実施月の割り出しにだけ使います）"
+            : isTable
+              ? "倍率は換算係数に掛ける値です（例：2ヶ月に1回 → 0.6）"
+              : "固定点数は容量によらずそのまま点数になります（例：3ヶ月に1回 → 0.2点）"
         }
       />
       <div className="divide-y divide-line">

@@ -5,6 +5,9 @@ import {
   seedInspectionCycles,
 } from "@/db/seed-data";
 import type { AppDocument } from "./document";
+
+/** 年次点検だけを請ける契約を表す設備区分の名前 */
+const ANNUAL_SUBCONTRACT_NAME = "年次請け";
 import {
   DOCUMENT_VERSION,
   NOT_SAVED,
@@ -147,8 +150,10 @@ export function parseDocument(raw: unknown): AppDocument {
     settings: { ...base.settings, ...(rawSettings as object | undefined) },
     coefficientTables: list("coefficientTables"),
     coefficientRows: list("coefficientRows"),
-    equipmentCategories: list("equipmentCategories"),
-    categoryCycles: list("categoryCycles"),
+    ...withAnnualSubcontract(
+      list("equipmentCategories") as AppDocument["equipmentCategories"],
+      list("categoryCycles") as AppDocument["categoryCycles"],
+    ),
     // 「年次点検のみ」は後から足した周期なので、無ければ補う
     inspectionCycles: withAnnualOnlyCycle(
       list("inspectionCycles") as AppDocument["inspectionCycles"],
@@ -216,4 +221,59 @@ function withAnnualOnlyCycle(
       isActive: 1,
     },
   ];
+}
+
+/**
+ * 年次点検だけを請ける仕事は保安管理業務ではないので、換算係数を当てない。
+ * 手で作ってある場合はそれを活かし、点数の決め方だけ「適用しない」に寄せる。
+ */
+function withAnnualSubcontract(
+  categories: AppDocument["equipmentCategories"],
+  cycles: AppDocument["categoryCycles"],
+): {
+  equipmentCategories: AppDocument["equipmentCategories"];
+  categoryCycles: AppDocument["categoryCycles"];
+} {
+  const found = categories.find((c) => c.name === ANNUAL_SUBCONTRACT_NAME);
+
+  const category = found ?? {
+    id: Math.max(0, ...categories.map((c) => c.id)) + 1,
+    name: ANNUAL_SUBCONTRACT_NAME,
+    categoryGroup: "other" as const,
+    capacityUnit: "none" as const,
+    calculationMethod: "excluded" as const,
+    coefficientTableId: null,
+    minCapacity: null,
+    maxCapacity: null,
+    note: "年次点検だけを請ける契約。換算係数を適用せず、保安管理点数にも算入しません",
+    sortOrder: Math.max(0, ...categories.map((c) => c.sortOrder)) + 1,
+    isActive: 1,
+  };
+
+  const nextCategories = found
+    ? categories.map((c) =>
+        c.id === category.id ? { ...c, calculationMethod: "excluded" as const } : c,
+      )
+    : [...categories, category];
+
+  // 設備行には周期の指定が要るので、1つも無ければ足す
+  const hasCycle = cycles.some((c) => c.categoryId === category.id);
+  const nextCycles = hasCycle
+    ? cycles
+    : [
+        ...cycles,
+        {
+          id: Math.max(0, ...cycles.map((c) => c.id)) + 1,
+          categoryId: category.id,
+          name: "年1回",
+          intervalMonths: 12,
+          multiplier: null,
+          fixedPoints: null,
+          requiresInsulationMonitor: 0,
+          conditionNote: "",
+          sortOrder: 0,
+        },
+      ];
+
+  return { equipmentCategories: nextCategories, categoryCycles: nextCycles };
 }
