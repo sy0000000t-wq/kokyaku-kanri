@@ -318,7 +318,7 @@ export function CustomerForm({
               <Field
                 label="訪問周期"
                 required
-                hint="現場に行く周期です。点検月のプリセットに使います（点数計算には影響しません）"
+                hint="現場に行く周期です。点検月のプリセットに使います（点数計算には影響しません）。年次点検だけの契約は「年次点検のみ」を選びます"
               >
                 <Select
                   name="inspectionCycleId"
@@ -589,6 +589,7 @@ export function CustomerForm({
                     {...bind("annualInspectionDay")}
                   />
                 </div>
+                {err("annualInspectionMonth")}
               </Field>
 
               <Field label="年次点検の実施可能日">
@@ -651,6 +652,11 @@ export function CustomerForm({
                 className="sm:col-span-2"
                 hint="周期を選ぶと自動でプリセットされます。実運用に合わせて個別に調整できます"
               >
+                {months.length === 0 && (
+                  <p className="mb-1.5 text-xs text-muted">
+                    通常点検なし。年次点検だけを行う契約として扱い、点検スケジュールには年次点検だけが出ます。
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-1.5">
                   {MONTHS.map((m) => {
                     const checked = months.includes(m);

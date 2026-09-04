@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/toast";
 import { StoreProvider } from "@/lib/store/context";
 import { ServiceWorkerRegistration } from "@/components/service-worker";
 import { StoreStatusBar } from "@/components/store-status-bar";
+import { APP_VERSION } from "@/lib/version";
 
 export const metadata: Metadata = {
   title: "顧客管理 | 電気保安管理",
@@ -38,7 +39,7 @@ export default function RootLayout({
             </main>
             <footer className="no-print mx-auto w-full max-w-[1400px] px-3 pb-6 sm:px-5">
               <p className="border-t border-line pt-3 text-xs text-muted">
-                電気保安管理 顧客管理ツール ｜{" "}
+                電気保安管理 顧客管理ツール {APP_VERSION} ｜{" "}
                 <Link href="/privacy" className="underline hover:text-ink">
                   プライバシーポリシー
                 </Link>

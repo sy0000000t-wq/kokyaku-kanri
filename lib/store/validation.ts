@@ -20,6 +20,17 @@ export function validateCustomer(
 
   if (!input.name.trim()) errors.name = "物件名称は必須です";
   if (!input.inspectionCycleId) errors.inspectionCycleId = "訪問周期は必須です";
+
+  // 通常点検のない契約（年次点検のみ）は、年次点検月がないと1回も点検が立たない
+  const cycle = doc.inspectionCycles.find((c) => c.id === input.inspectionCycleId);
+  if (
+    cycle?.intervalMonths === 0 &&
+    input.inspectionMonths.length === 0 &&
+    input.annualInspectionMonth == null
+  ) {
+    errors.annualInspectionMonth =
+      "通常点検がない契約では年次点検月が必須です";
+  }
   if (!Number.isFinite(input.monthlyFee)) errors.monthlyFee = "月額（税抜）は必須です";
   else if (input.monthlyFee < 0) errors.monthlyFee = "月額は 0 以上で入力してください";
   if (!input.address.trim()) errors.address = "住所は必須です";

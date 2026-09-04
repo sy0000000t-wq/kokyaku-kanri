@@ -149,7 +149,10 @@ export function parseDocument(raw: unknown): AppDocument {
     coefficientRows: list("coefficientRows"),
     equipmentCategories: list("equipmentCategories"),
     categoryCycles: list("categoryCycles"),
-    inspectionCycles: list("inspectionCycles"),
+    // 「年次点検のみ」は後から足した周期なので、無ければ補う
+    inspectionCycles: withAnnualOnlyCycle(
+      list("inspectionCycles") as AppDocument["inspectionCycles"],
+    ),
     billingCycles: list("billingCycles"),
     // 項目を後から増やしているので、古いデータには既定値を補う
     customers: (list("customers") as AppDocument["customers"]).map((c) => ({
@@ -196,4 +199,21 @@ export function parseDocument(raw: unknown): AppDocument {
           .map((n) => ({ month: n.month, note: n.note })),
     annualFocus: list("annualFocus"),
   };
+}
+
+/** 通常点検のない契約（年次点検のみ）を選べるようにする */
+function withAnnualOnlyCycle(
+  cycles: AppDocument["inspectionCycles"],
+): AppDocument["inspectionCycles"] {
+  if (cycles.some((c) => c.intervalMonths === 0)) return cycles;
+  return [
+    ...cycles,
+    {
+      id: Math.max(0, ...cycles.map((c) => c.id)) + 1,
+      name: "年次点検のみ",
+      intervalMonths: 0,
+      sortOrder: Math.max(0, ...cycles.map((c) => c.sortOrder)) + 1,
+      isActive: 1,
+    },
+  ];
 }

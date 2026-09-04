@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ToggleChip } from "@/components/schedule/toggle-chip";
 import { useStore } from "@/lib/store/context";
 import {
   setInspectionHelper,
@@ -19,38 +20,39 @@ type Key = {
 
 const TYPE_LABEL = { regular: "通常点検", annual: "年次点検" } as const;
 
+const keyOf = (k: Key) => ({
+  customerId: k.customerId,
+  year: k.year,
+  month: k.month,
+  type: k.type,
+});
+
 /**
- * 報告書の提出チェック。
+ * 報告書の提出トグル。
  * 点検を終えても提出はあとになるので、実施済みとは別に持つ。
  */
 export function ReportedCheck({
   isReported,
-  compact,
+  label = "報告",
+  size,
   ...key
-}: Key & { isReported: boolean; compact?: boolean }) {
+}: Key & { isReported: boolean; label?: string; size?: "sm" | "md" }) {
   const { update } = useStore();
 
   return (
-    <label className="inline-flex cursor-pointer items-center gap-1.5">
-      <input
-        type="checkbox"
-        className="size-4 accent-[oklch(0.52_0.15_250)]"
-        checked={isReported}
-        onChange={(e) =>
-          update((doc) =>
-            setInspectionReported(doc, {
-              customerId: key.customerId,
-              year: key.year,
-              month: key.month,
-              type: key.type,
-              isReported: e.target.checked,
-            }),
-          )
-        }
-        aria-label={`${key.customerName} ${key.year}年${key.month}月の${TYPE_LABEL[key.type]} 報告書提出済み`}
-      />
-      {!compact && <span className="text-xs">報告書提出</span>}
-    </label>
+    <ToggleChip
+      label={label}
+      active={isReported}
+      tone="brand"
+      size={size}
+      ariaLabel={`${key.customerName} ${key.year}年${key.month}月の${TYPE_LABEL[key.type]} 報告書提出済み`}
+      title="報告書を提出した"
+      onToggle={(next) =>
+        update((doc) =>
+          setInspectionReported(doc, { ...keyOf(key), isReported: next }),
+        )
+      }
+    />
   );
 }
 
@@ -70,29 +72,27 @@ export function SwitchgearRequestCheck({
     <div
       className={cn(
         "rounded border px-2 py-1.5",
-        isRequested ? "border-ok/40 bg-ok-soft" : "border-warn/40 bg-warn-soft",
+        isRequested ? "border-line" : "border-warn/40 bg-warn-soft",
       )}
     >
-      <label className="inline-flex cursor-pointer items-center gap-1.5">
-        <input
-          type="checkbox"
-          className="size-4 accent-[oklch(0.52_0.15_250)]"
-          checked={isRequested}
-          onChange={(e) =>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs">中電PGの開閉器操作</span>
+        <ToggleChip
+          label="申込"
+          active={isRequested}
+          tone="brand"
+          ariaLabel={`${key.customerName} ${key.year}年${key.month}月の年次点検 中電PG開閉器操作 申込済み`}
+          title="中電PGへ開閉器操作を申し込んだ"
+          onToggle={(next) =>
             update((doc) =>
               setInspectionSwitchgearRequested(doc, {
-                customerId: key.customerId,
-                year: key.year,
-                month: key.month,
-                type: key.type,
-                isRequested: e.target.checked,
+                ...keyOf(key),
+                isRequested: next,
               }),
             )
           }
-          aria-label={`${key.customerName} ${key.year}年${key.month}月の年次点検 中電PG開閉器操作 申込済み`}
         />
-        <span className="text-xs">中電PGへ開閉器操作を申込済み</span>
-      </label>
+      </div>
       {note && <p className="mt-1 text-xs text-muted">{note}</p>}
     </div>
   );
@@ -116,17 +116,12 @@ export function HelperFields({
     if (!editing) setValue(helperName);
   }, [helperName, editing]);
 
-  const common = {
-    customerId: key.customerId,
-    year: key.year,
-    month: key.month,
-    type: key.type,
-  };
-
   const commitName = () => {
     setEditing(false);
     if (helperName === value) return;
-    update((doc) => setInspectionHelper(doc, { ...common, helperName: value }));
+    update((doc) =>
+      setInspectionHelper(doc, { ...keyOf(key), helperName: value }),
+    );
   };
 
   return (
@@ -136,24 +131,22 @@ export function HelperFields({
         needsHelper ? "border-warn/40 bg-warn-soft" : "border-line",
       )}
     >
-      <label className="inline-flex cursor-pointer items-center gap-1.5">
-        <input
-          type="checkbox"
-          className="size-4 accent-[oklch(0.68_0.15_65)]"
-          checked={needsHelper}
-          onChange={(e) => {
-            setValue(e.target.checked ? value : "");
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs">年次点検の応援</span>
+        <ToggleChip
+          label="依頼"
+          active={needsHelper}
+          tone="warn"
+          ariaLabel={`${key.customerName} ${key.year}年${key.month}月の年次点検 応援を依頼する`}
+          title="応援を依頼する"
+          onToggle={(next) => {
+            if (!next) setValue("");
             update((doc) =>
-              setInspectionHelper(doc, {
-                ...common,
-                needsHelper: e.target.checked,
-              }),
+              setInspectionHelper(doc, { ...keyOf(key), needsHelper: next }),
             );
           }}
-          aria-label={`${key.customerName} ${key.year}年${key.month}月の年次点検 応援を依頼する`}
         />
-        <span className="text-xs">応援を依頼する</span>
-      </label>
+      </div>
 
       {needsHelper && (
         <input

@@ -255,6 +255,8 @@ export const seedInspectionCycles = [
   { name: "4ヶ月点検", intervalMonths: 4 },
   { name: "6ヶ月点検", intervalMonths: 6 },
   { name: "年1回点検", intervalMonths: 12 },
+  // 通常点検がなく、年次点検だけを行う契約
+  { name: "年次点検のみ", intervalMonths: 0 },
 ];
 
 /** §3.9 / §7 請求サイクルマスタ */

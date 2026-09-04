@@ -8,7 +8,6 @@ import {
   normalizeMonth,
   parseYearMonth,
   resolveFacilityStartMonth,
-  scheduleSymbol,
 } from "@/lib/calc/schedule";
 
 describe("generateCycleMonths §3.7", () => {
@@ -78,7 +77,7 @@ describe("isActiveInMonth §4.4", () => {
   });
 });
 
-describe("getInspectionTarget / scheduleSymbol §4.4", () => {
+describe("getInspectionTarget §4.4", () => {
   const t01 = {
     isActive: 1,
     contractStartDate: "2026-03-01",
@@ -90,18 +89,15 @@ describe("getInspectionTarget / scheduleSymbol §4.4", () => {
   it("通常点検月と年次点検月が同月なら両方対象", () => {
     const r = getInspectionTarget(t01, { year: 2026, month: 3 });
     expect(r).toEqual({ regular: true, annual: true });
-    expect(scheduleSymbol(r)).toBe("●★");
   });
 
   it("通常点検のみの月", () => {
     const r = getInspectionTarget(t01, { year: 2026, month: 5 });
     expect(r).toEqual({ regular: true, annual: false });
-    expect(scheduleSymbol(r)).toBe("●");
   });
 
   it("対象外の月", () => {
     const r = getInspectionTarget(t01, { year: 2026, month: 4 });
-    expect(scheduleSymbol(r)).toBe("−");
   });
 
   it("契約開始前の1月は対象外（実施月に含まれていても）", () => {

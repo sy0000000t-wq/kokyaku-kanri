@@ -138,10 +138,3 @@ export function getInspectionTarget(
   };
 }
 
-/** §4.4 年間マトリクスの表示記号 */
-export function scheduleSymbol(target: InspectionTarget): string {
-  if (target.regular && target.annual) return "●★";
-  if (target.regular) return "●";
-  if (target.annual) return "★";
-  return "−";
-}

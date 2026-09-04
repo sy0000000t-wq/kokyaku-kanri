@@ -15,7 +15,7 @@ import { FocusItems } from "@/components/schedule/focus-items";
 import { PeriodNav } from "@/components/period-nav";
 import { ScopeFilter } from "@/components/scope-filter";
 import { Badge, Card, CardHeader, EmptyState } from "@/components/ui";
-import { getInspectionTarget, scheduleSymbol } from "@/lib/calc/schedule";
+import { getInspectionTarget } from "@/lib/calc/schedule";
 import { useStore } from "@/lib/store/context";
 import { buildInspectionGrid, type InspectionCell } from "@/lib/store/monthly";
 import { groupByCity } from "@/lib/store/route-groups";
@@ -86,7 +86,7 @@ function SchedulePageInner() {
         <Card className="overflow-hidden">
           <CardHeader
             title="年間マトリクス"
-            description="上段が予定（● 通常／★ 年次／− 対象外）、中段が実施チェック（緑）、下段が報告書提出チェック（青）"
+            description="● が通常点検、★ が年次点検。「点検」を押すと緑、「報告」を押すと青になります（報告＝報告書の提出済み）"
           />
           {rows.length === 0 ? (
             <EmptyState>表示できる顧客がありません。</EmptyState>
@@ -172,16 +172,13 @@ function SchedulePageInner() {
                               m === period.month && "bg-brand-soft/40",
                             )}
                           >
-                            <div className="text-xs leading-4">
-                              {showRegular || showAnnual
-                                ? scheduleSymbol({
-                                    regular: showRegular,
-                                    annual: showAnnual,
-                                  })
-                                : "−"}
-                            </div>
-                            <div className="mt-0.5 flex justify-center gap-1">
-                              {showRegular && (
+                            {!showRegular && !showAnnual && (
+                              <div className="text-xs leading-4 text-muted">−</div>
+                            )}
+                            {/* 種別ごとに1行。記号がその行の点検を表す */}
+                            {showRegular && (
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-xs text-brand">●</span>
                                 <InspectionCheck
                                   customerId={c.id}
                                   customerName={c.name}
@@ -190,8 +187,24 @@ function SchedulePageInner() {
                                   type="regular"
                                   isDone={regular.isDone}
                                 />
-                              )}
-                              {showAnnual && (
+                                <ReportedCheck
+                                  customerId={c.id}
+                                  customerName={c.name}
+                                  year={period.year}
+                                  month={m}
+                                  type="regular"
+                                  isReported={regular.isReported}
+                                />
+                              </div>
+                            )}
+                            {showAnnual && (
+                              <div
+                                className={cn(
+                                  "flex items-center justify-center gap-1",
+                                  showRegular && "mt-1",
+                                )}
+                              >
+                                <span className="text-xs text-warn">★</span>
                                 <InspectionCheck
                                   customerId={c.id}
                                   customerName={c.name}
@@ -200,22 +213,6 @@ function SchedulePageInner() {
                                   type="annual"
                                   isDone={annual.isDone}
                                 />
-                              )}
-                            </div>
-                            {/* 報告書は提出が後日になるので、実施と別の段でチェックする */}
-                            <div className="flex justify-center gap-1">
-                              {showRegular && (
-                                <ReportedCheck
-                                  customerId={c.id}
-                                  customerName={c.name}
-                                  year={period.year}
-                                  month={m}
-                                  type="regular"
-                                  isReported={regular.isReported}
-                                  compact
-                                />
-                              )}
-                              {showAnnual && (
                                 <ReportedCheck
                                   customerId={c.id}
                                   customerName={c.name}
@@ -223,10 +220,9 @@ function SchedulePageInner() {
                                   month={m}
                                   type="annual"
                                   isReported={annual.isReported}
-                                  compact
                                 />
-                              )}
-                            </div>
+                              </div>
+                            )}
                           </td>
                         );
                       })}
@@ -434,36 +430,38 @@ function InspectionListItem({
       </div>
 
       <div className="flex w-full flex-col gap-2 sm:w-64">
-        <div className="flex items-center justify-end gap-3">
-          {cell.doneDate && (
-            <span className="tabular text-xs text-muted">{formatDate(cell.doneDate)}</span>
-          )}
-          <InspectionCheck
-            customerId={c.id}
-            customerName={c.name}
-            year={period.year}
-            month={period.month}
-            type={cell.type}
-            isDone={cell.isDone}
-            label="実施済み"
-          />
-        </div>
-
-        {/* 点検を終えても提出はあとになるので、実施とは別にチェックする */}
-        <div className="flex items-center justify-end gap-3">
-          {cell.reportedDate && (
-            <span className="tabular text-xs text-muted">
-              {formatDate(cell.reportedDate)}
+        {/* 点検を終えても報告書の提出はあとになるので、別々に押せるようにする */}
+        <div className="grid grid-cols-2 gap-2">
+          <div className="flex flex-col gap-0.5">
+            <InspectionCheck
+              customerId={c.id}
+              customerName={c.name}
+              year={period.year}
+              month={period.month}
+              type={cell.type}
+              isDone={cell.isDone}
+              label="点検済み"
+              size="md"
+            />
+            <span className="tabular text-center text-[11px] text-muted">
+              {cell.doneDate ? formatDate(cell.doneDate) : "—"}
             </span>
-          )}
-          <ReportedCheck
-            customerId={c.id}
-            customerName={c.name}
-            year={period.year}
-            month={period.month}
-            type={cell.type}
-            isReported={cell.isReported}
-          />
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <ReportedCheck
+              customerId={c.id}
+              customerName={c.name}
+              year={period.year}
+              month={period.month}
+              type={cell.type}
+              isReported={cell.isReported}
+              label="報告書提出"
+              size="md"
+            />
+            <span className="tabular text-center text-[11px] text-muted">
+              {cell.reportedDate ? formatDate(cell.reportedDate) : "—"}
+            </span>
+          </div>
         </div>
 
         {/* 停電に開閉器操作の申し込みが要る物件は、出したかどうかを追う */}

@@ -28,6 +28,7 @@ import {
 } from "@/lib/store/mutations";
 import { validateCustomer } from "@/lib/store/validation";
 import type { AppDocument } from "@/lib/store/document";
+import { getInspectionTarget } from "@/lib/calc/schedule";
 
 function categoryCycle(doc: AppDocument, categoryName: string, cycleName: string) {
   const category = doc.equipmentCategories.find((c) => c.name === categoryName)!;
@@ -815,5 +816,73 @@ describe("点検実績のレコードの形", () => {
     expect(next.inspectionRecords[0].helperName).toBe("山田");
     expect(next.inspectionRecords[0].needsHelper).toBe(0);
     expect(next.inspectionRecords[0].isDone).toBe(0);
+  });
+});
+
+describe("年次点検のみの契約", () => {
+  it("通常点検のない周期を選べる", () => {
+    const doc = createInitialDocument();
+    const annualOnly = doc.inspectionCycles.find((c) => c.intervalMonths === 0);
+    expect(annualOnly?.name).toBe("年次点検のみ");
+  });
+
+  it("通常点検の実施月が空でも、年次点検月があれば登録できる", () => {
+    const doc = createInitialDocument();
+    const annualOnly = doc.inspectionCycles.find((c) => c.intervalMonths === 0)!;
+
+    const errors = validateCustomer(doc, {
+      ...input(doc),
+      inspectionCycleId: annualOnly.id,
+      inspectionMonths: [],
+      annualInspectionMonth: 9,
+    });
+
+    expect(errors.annualInspectionMonth).toBeUndefined();
+    expect(Object.keys(errors)).toHaveLength(0);
+  });
+
+  it("通常点検も年次点検月もないと弾く", () => {
+    const doc = createInitialDocument();
+    const annualOnly = doc.inspectionCycles.find((c) => c.intervalMonths === 0)!;
+
+    const errors = validateCustomer(doc, {
+      ...input(doc),
+      inspectionCycleId: annualOnly.id,
+      inspectionMonths: [],
+      annualInspectionMonth: null,
+    });
+
+    expect(errors.annualInspectionMonth).toBeDefined();
+  });
+
+  it("年次点検のみの顧客は、年次点検月にだけ点検が立つ", () => {
+    const doc = createInitialDocument();
+    const annualOnly = doc.inspectionCycles.find((c) => c.intervalMonths === 0)!;
+    const { doc: saved } = saveCustomer(doc, {
+      ...input(doc),
+      inspectionCycleId: annualOnly.id,
+      inspectionMonths: [],
+      annualInspectionMonth: 9,
+    });
+
+    const view = getCustomerViews(saved, buildIndexes(saved))[0];
+    expect(view.inspectionMonths).toEqual([]);
+
+    const months = [];
+    for (let m = 1; m <= 12; m++) {
+      const t = getInspectionTarget(
+        {
+          isActive: view.isActive,
+          contractStartDate: view.contractStartDate,
+          contractEndDate: view.contractEndDate,
+          inspectionMonths: view.inspectionMonths,
+          annualInspectionMonth: view.annualInspectionMonth,
+        },
+        { year: 2026, month: m },
+      );
+      if (t.regular || t.annual) months.push({ month: m, ...t });
+    }
+
+    expect(months).toEqual([{ month: 9, regular: false, annual: true }]);
   });
 });
