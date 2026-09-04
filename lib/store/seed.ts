@@ -9,7 +9,9 @@ import { parseYearMonth } from "@/lib/calc/schedule";
 import type { AppDocument } from "./document";
 
 /** 年次点検だけを請ける契約を表す設備区分の名前 */
-const ANNUAL_SUBCONTRACT_NAME = "年次請け";
+const EXTERNAL_CATEGORY_NAME = "保安管理契約外";
+/** 以前は「年次請け」という名前だった */
+const EXTERNAL_CATEGORY_OLD_NAMES = ["年次請け"];
 import {
   DOCUMENT_VERSION,
   NOT_SAVED,
@@ -152,7 +154,7 @@ export function parseDocument(raw: unknown): AppDocument {
     settings: { ...base.settings, ...(rawSettings as object | undefined) },
     coefficientTables: list("coefficientTables"),
     coefficientRows: list("coefficientRows"),
-    ...withAnnualSubcontract(
+    ...withExternalCategory(
       list("equipmentCategories") as AppDocument["equipmentCategories"],
       // 「絶縁監視装置が必須」はやめたので、古いデータからは落とす
       (list("categoryCycles") as AppDocument["categoryCycles"]).map(
@@ -187,9 +189,19 @@ export function parseDocument(raw: unknown): AppDocument {
       switchgearRequestRequired: c.switchgearRequestRequired ?? 0,
       switchgearRequestNote: c.switchgearRequestNote ?? "",
       // これまでは期間ぶんをまとめる前提だったので、既定はそのまま
-      billingCoverage: c.billingCoverage ?? "period",
-      // これまでは月額制しかなかった
-      feeBasis: c.feeBasis ?? "monthly",
+      // 料金の積み方と請求の対象期間は、契約種別ひとつにまとめた
+      contractType:
+        c.contractType ??
+        (() => {
+          // 以前は料金の決め方と請求の対象期間を別々に持っていた
+          const old = c as unknown as {
+            feeBasis?: string;
+            billingCoverage?: string;
+          };
+          return old.feeBasis === "perVisit" || old.billingCoverage === "single"
+            ? ("external" as const)
+            : ("hoan" as const);
+        })(),
     })),
     // 設備ごとの点検開始月は後から足したので、無ければ顧客に合わせる（null）
     customerFacilities: (list("customerFacilities") as AppDocument["customerFacilities"]).map(
@@ -244,35 +256,46 @@ function withAnnualOnlyCycle(
 }
 
 /**
- * 年次点検だけを請ける仕事は保安管理業務ではないので、換算係数を当てない。
+ * 保安管理契約外の仕事は保安管理業務ではないので、換算係数を当てない。
  * 手で作ってある場合はそれを活かし、点数の決め方だけ「適用しない」に寄せる。
  */
-function withAnnualSubcontract(
+function withExternalCategory(
   categories: AppDocument["equipmentCategories"],
   cycles: AppDocument["categoryCycles"],
 ): {
   equipmentCategories: AppDocument["equipmentCategories"];
   categoryCycles: AppDocument["categoryCycles"];
 } {
-  const found = categories.find((c) => c.name === ANNUAL_SUBCONTRACT_NAME);
+  const found = categories.find(
+    (c) =>
+      c.name === EXTERNAL_CATEGORY_NAME ||
+      EXTERNAL_CATEGORY_OLD_NAMES.includes(c.name),
+  );
 
   const category = found ?? {
     id: Math.max(0, ...categories.map((c) => c.id)) + 1,
-    name: ANNUAL_SUBCONTRACT_NAME,
+    name: EXTERNAL_CATEGORY_NAME,
     categoryGroup: "other" as const,
     capacityUnit: "none" as const,
     calculationMethod: "excluded" as const,
     coefficientTableId: null,
     minCapacity: null,
     maxCapacity: null,
-    note: "年次点検だけを請ける契約。換算係数を適用せず、保安管理点数にも算入しません",
+    note: "保安管理契約外の仕事。換算係数を適用せず、保安管理点数にも算入しません",
     sortOrder: Math.max(0, ...categories.map((c) => c.sortOrder)) + 1,
     isActive: 1,
   };
 
   const nextCategories = found
     ? categories.map((c) =>
-        c.id === category.id ? { ...c, calculationMethod: "excluded" as const } : c,
+        c.id === category.id
+          ? {
+              ...c,
+              // 呼び方を「保安管理契約外」にそろえる
+              name: EXTERNAL_CATEGORY_NAME,
+              calculationMethod: "excluded" as const,
+            }
+          : c,
       )
     : [...categories, category];
 

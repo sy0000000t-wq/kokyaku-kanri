@@ -35,7 +35,7 @@ export function generateBillingMonths(
  * その請求が何月分をまとめたものかを返す（古い順）。
  * 「3・4月分」のように画面へ出して、取り違えを防ぐために使う。
  *
- * coverage = "single" は、実施した月をその月に請求する契約（年次請けなど）。
+ * coverage = "single" は、実施した月をその月に請求する契約（保安管理契約外）。
  * 当月分だけが対象になる。
  *
  * coverage = "period" は、期間ぶんをまとめて後払いする保安管理契約。
@@ -96,11 +96,11 @@ export function isBillingTarget(
 export type BillingAmountInput = {
   /** 月額税込 */
   monthlyIncl: number;
-  /** 料金の決め方。perVisit は巡回1回あたりで請求する */
+  /** 料金の決め方。perVisit は1回あたりの金額で請求する */
   feeBasis?: FeeBasis;
-  /** 巡回1回あたりの税込額（perVisit のときに使う） */
+  /** 1回あたりの税込額（perVisit のときに使う） */
   visitFeeIncl?: number;
-  /** その月に通常点検（巡回）があるか（perVisit のときに使う） */
+  /** その月に通常点検があるか（perVisit のときに使う） */
   isInspectionMonth?: boolean;
   annualFeeHandling: "included" | "separate";
   /** 年次点検費の税込額 */
@@ -116,7 +116,7 @@ export type BillingAmountInput = {
  *
  * 月額制なら 月額 × まとめる月数。隔月請求では1回で2ヶ月分をまとめるため、
  * 月額をそのまま出すと不足する。
- * 1回あたりの契約なら、その月に巡回があったぶんだけを積む。
+ * 保安管理契約外なら、その月に実施があったぶんだけを積む。
  * どちらも、別途請求の年次点検費は年次点検月に乗せる。
  */
 export function calcDefaultBillingAmount(input: BillingAmountInput): number {

@@ -6,19 +6,19 @@ export type FeeTaxMode = "excluded" | "included";
 /**
  * 料金の決め方。
  * monthly  … 月額 × 12ヶ月（保安管理契約）
- * perVisit … 巡回1回あたり × 巡回回数（年次請け・不規則な物件）
+ * perVisit … 1回あたりの金額 × 実施回数（保安管理契約外）
  */
 export type FeeBasis = "monthly" | "perVisit";
 
 export type PricingInput = {
   /**
-   * 月額、または巡回1回あたりの金額（feeBasis で意味が変わる）。
+   * 月額、または1回あたりの金額（feeBasis で意味が変わる）。
    * 税抜か税込かは monthlyFeeTaxMode で決まる
    */
   monthlyFee: number;
   monthlyFeeTaxMode?: FeeTaxMode;
   feeBasis?: FeeBasis;
-  /** perVisit のときの巡回回数（通常点検の実施月の数） */
+  /** perVisit のときの実施回数（通常点検の実施月の数） */
   visitsPerYear?: number;
   annualFeeHandling: AnnualFeeHandling;
   /** 年次点検費。separate のときのみ加算する */
@@ -35,10 +35,10 @@ export type PricingResult = {
   /** 月額。perVisit のときは年額を12で割った月額換算 */
   monthlyExcl: number;
   monthlyIncl: number;
-  /** 巡回1回あたり。monthly のときは月額と同じ値 */
+  /** 1回あたりの金額。monthly のときは月額と同じ値 */
   visitFeeExcl: number;
   visitFeeIncl: number;
-  /** 年間の巡回回数。monthly のときは 12 */
+  /** 年間の実施回数。monthly のときは 12 */
   visitsPerYear: number;
   annualExcl: number;
   annualIncl: number;
@@ -92,7 +92,7 @@ export function calcPricing(input: PricingInput): PricingResult {
   );
 
   const basis = input.feeBasis ?? "monthly";
-  // 月額制は毎月ぶん、1回あたりなら実際に行く回数ぶんを積む
+  // 月額制は毎月ぶん、保安管理契約外なら実際に行く回数ぶんを積む
   const visitsPerYear =
     basis === "perVisit" ? Math.max(0, Math.round(input.visitsPerYear ?? 0)) : 12;
 
@@ -112,11 +112,11 @@ export function calcPricing(input: PricingInput): PricingResult {
     taxFactor,
   );
 
-  // 年額は巡回ぶんと年次点検費の合計
+  // 年額は実施ぶんと年次点検費の合計
   const annualExcl = feeTotal.excl + annualFee.excl;
   const annualIncl = feeTotal.incl + annualFee.incl;
 
-  // 一覧では月額の列で見比べるので、1回あたりの契約は月額換算を出す
+  // 一覧では月額の列で見比べるので、保安管理契約外は月額換算を出す
   const monthly =
     basis === "perVisit"
       ? { excl: roundYen(annualExcl / 12), incl: roundYen(annualIncl / 12) }

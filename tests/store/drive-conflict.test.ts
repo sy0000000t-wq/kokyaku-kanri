@@ -31,7 +31,7 @@ function docWith(names: string[]): AppDocument {
     inspectionCycleId: 1,
     monthlyFee: 0,
     monthlyFeeTaxMode: "excluded" as const,
-    feeBasis: "monthly" as const,
+    contractType: "hoan" as const,
     annualFeeHandling: "included" as const,
     annualInspectionFee: null,
     annualFeeTaxMode: "excluded" as const,
@@ -46,8 +46,7 @@ function docWith(names: string[]): AppDocument {
     priorContactRequired: 0, priorContactNote: "",
  switchgearRequestRequired: 0,
  switchgearRequestNote: "",
-    billingCycleId: 1, billingCoverage: "period" as const,
- paymentLagMonths: 1, isActive: 1, note: "",
+    billingCycleId: 1, paymentLagMonths: 1, isActive: 1, note: "",
     createdAt: "", updatedAt: "",
   }));
   return doc;

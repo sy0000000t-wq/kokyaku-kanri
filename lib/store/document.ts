@@ -14,20 +14,41 @@ export type CapacityUnit = "kVA" | "kW" | "none";
  * 点数の決め方。
  * table  … 容量から換算係数を引き、周期ごとの倍率を掛ける
  * fixed  … 周期ごとの固定点数をそのまま使う
- * excluded … 換算係数を適用せず、保安管理点数にも算入しない（年次請けなど）
+ * excluded … 換算係数を適用せず、保安管理点数にも算入しない（保安管理契約外）
  */
 export type CalculationMethod = "table" | "fixed" | "excluded";
 export type CategoryGroup = "demand" | "generation" | "other";
 /**
+ * 契約の種類。料金の積み方と請求の対象期間は、これひとつで決まる。
+ *
+ * hoan     … 保安管理契約。月額 × 12ヶ月、請求は前回請求の翌月から当月まで
+ * external … 保安管理契約外。1回あたり × 実施回数、請求は当月分のみ
+ *
+ * 保安管理契約外は、年次点検だけを請ける仕事や、
+ * 実施月・請求月が周期どおりに来ない物件を指す。
+ */
+export type ContractType = "hoan" | "external";
+
+/** 契約種別から料金の決め方を決める */
+export function feeBasisOf(contractType: ContractType): FeeBasis {
+  return contractType === "external" ? "perVisit" : "monthly";
+}
+
+/** 契約種別から請求の対象期間を決める */
+export function billingCoverageOf(contractType: ContractType): BillingCoverage {
+  return contractType === "external" ? "single" : "period";
+}
+
+/**
  * 請求が何月分を対象にするか。
  * period … 前回請求の翌月から当月まで（保安管理契約。隔月なら2ヶ月分）
- * single … 当月分のみ（年次請けなど、実施した月をその月に請求する契約）
+ * single … 当月分のみ（保安管理契約外。実施した月をその月に請求する）
  */
 export type BillingCoverage = "period" | "single";
 export type AnnualFeeHandling = "included" | "separate";
 /** 入力した金額が税抜か税込か */
 export type FeeTaxMode = "excluded" | "included";
-/** 料金の決め方。月額×12 か、巡回1回あたり×回数か */
+/** 料金の決め方。月額×12 か、1回あたり×実施回数か */
 export type FeeBasis = "monthly" | "perVisit";
 export type DistanceMethod = "road" | "straight";
 /** 年次点検を実施できる曜日の区分 */
@@ -117,8 +138,8 @@ export type Customer = {
   monthlyFee: number;
   /** 月額を税抜で入れたか税込で入れたか */
   monthlyFeeTaxMode: FeeTaxMode;
-  /** 月額制か、巡回1回あたりか */
-  feeBasis: FeeBasis;
+  /** 保安管理契約か、保安管理契約外か */
+  contractType: ContractType;
   annualFeeHandling: AnnualFeeHandling;
   annualInspectionFee: number | null;
   /** 年次点検費を税抜で入れたか税込で入れたか */
@@ -151,8 +172,6 @@ export type Customer = {
   /** 開閉器操作申し込みの補足（申込先・期限など） */
   switchgearRequestNote: string;
   billingCycleId: number | null;
-  /** 請求が何月分を対象にするか */
-  billingCoverage: BillingCoverage;
   paymentLagMonths: number;
   isActive: number;
   note: string;

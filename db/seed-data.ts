@@ -240,12 +240,12 @@ export const seedEquipmentCategories: SeedEquipmentCategory[] = [
     ],
   },
   {
-    // 年次点検だけを請ける仕事。保安管理業務ではないので換算係数を当てない
-    name: "年次請け",
+    // 保安管理契約外の仕事。保安管理業務ではないので換算係数を当てない
+    name: "保安管理契約外",
     categoryGroup: "other",
     capacityUnit: "none",
     calculationMethod: "excluded",
-    note: "年次点検だけを請ける契約。換算係数を適用せず、保安管理点数にも算入しません",
+    note: "保安管理契約外の仕事。換算係数を適用せず、保安管理点数にも算入しません",
     cycles: [{ name: "年1回", intervalMonths: 12 }],
   },
 ];

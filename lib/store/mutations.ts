@@ -4,13 +4,12 @@ import {
   nextId,
   type AnnualAvailability,
   type AppDocument,
-  type BillingCoverage,
   type BillingCycle,
   type CategoryCycle,
   type CoefficientRow,
   type Customer,
   type CustomerFacility,
-  type FeeBasis,
+  type ContractType,
   type EquipmentCategory,
   type InspectionCycle,
   type InspectionRecord,
@@ -48,7 +47,7 @@ export type CustomerInput = {
   inspectionCycleId: number;
   monthlyFee: number;
   monthlyFeeTaxMode: "excluded" | "included";
-  feeBasis: FeeBasis;
+  contractType: ContractType;
   annualFeeHandling: "included" | "separate";
   annualInspectionFee: number | null;
   annualFeeTaxMode: "excluded" | "included";
@@ -70,7 +69,6 @@ export type CustomerInput = {
   switchgearRequestRequired: number;
   switchgearRequestNote: string;
   billingCycleId: number | null;
-  billingCoverage: BillingCoverage;
   paymentLagMonths: number;
   isActive: number;
   note: string;
@@ -103,7 +101,7 @@ export function saveCustomer(
     inspectionCycleId: input.inspectionCycleId,
     monthlyFee: input.monthlyFee,
     monthlyFeeTaxMode: input.monthlyFeeTaxMode,
-    feeBasis: input.feeBasis,
+    contractType: input.contractType,
     annualFeeHandling: input.annualFeeHandling,
     annualInspectionFee: input.annualInspectionFee,
     annualFeeTaxMode: input.annualFeeTaxMode,
@@ -129,7 +127,6 @@ export function saveCustomer(
     switchgearRequestRequired: input.switchgearRequestRequired,
     switchgearRequestNote: input.switchgearRequestNote,
     billingCycleId: input.billingCycleId,
-    billingCoverage: input.billingCoverage,
     paymentLagMonths: input.paymentLagMonths,
     isActive: input.isActive,
     note: input.note,

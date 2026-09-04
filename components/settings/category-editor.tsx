@@ -178,7 +178,7 @@ function CategoryForm({
     <Card>
       <CardHeader
         title={category ? "区分の設定" : "新しい区分"}
-        description="係数表方式は「容量から係数を引いて倍率を掛ける」、固定方式は「周期ごとの固定点数」。年次請けのように保安管理点数に入らないものは「換算係数を適用しない」を選びます"
+        description="係数表方式は「容量から係数を引いて倍率を掛ける」、固定方式は「周期ごとの固定点数」。保安管理契約外のように保安管理点数に入らないものは「換算係数を適用しない」を選びます"
       />
       <form onSubmit={submit}>
         <div className="grid gap-3 p-4 sm:grid-cols-2">

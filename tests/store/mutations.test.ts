@@ -29,6 +29,8 @@ import {
 import { validateCustomer } from "@/lib/store/validation";
 import type { AppDocument } from "@/lib/store/document";
 import { getInspectionTarget } from "@/lib/calc/schedule";
+import { billingCoverageOf, feeBasisOf } from "@/lib/store/document";
+import { parseDocument } from "@/lib/store/seed";
 
 function categoryCycle(doc: AppDocument, categoryName: string, cycleName: string) {
   const category = doc.equipmentCategories.find((c) => c.name === categoryName)!;
@@ -51,7 +53,7 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
     inspectionCycleId: doc.inspectionCycles[1].id,
     monthlyFee: 17500,
     monthlyFeeTaxMode: "excluded" as const,
-    feeBasis: "monthly" as const,
+    contractType: "hoan" as const,
     annualFeeHandling: "included",
     annualInspectionFee: null,
     annualFeeTaxMode: "excluded" as const,
@@ -73,7 +75,6 @@ function input(doc: AppDocument, overrides: Partial<CustomerInput> = {}): Custom
     switchgearRequestRequired: 0,
     switchgearRequestNote: "",
     billingCycleId: doc.billingCycles[0].id,
-    billingCoverage: "period" as const,
     paymentLagMonths: 1,
     isActive: 1,
     note: "",
@@ -890,5 +891,63 @@ describe("年次点検のみの契約", () => {
     }
 
     expect(months).toEqual([{ month: 9, regular: false, annual: true }]);
+  });
+});
+
+describe("契約種別", () => {
+  it("保安管理契約は月額制で、請求は対象期間ぶん", () => {
+    expect(feeBasisOf("hoan")).toBe("monthly");
+    expect(billingCoverageOf("hoan")).toBe("period");
+  });
+
+  it("保安管理契約外は1回あたりで、請求は当月分のみ", () => {
+    expect(feeBasisOf("external")).toBe("perVisit");
+    expect(billingCoverageOf("external")).toBe("single");
+  });
+
+  it("設備区分「保安管理契約外」は換算係数の対象外として用意される", () => {
+    const doc = createInitialDocument();
+    const category = doc.equipmentCategories.find(
+      (c) => c.name === "保安管理契約外",
+    );
+    expect(category?.calculationMethod).toBe("excluded");
+    // 設備行には周期の指定が要るので、必ず1つ以上ある
+    expect(
+      doc.categoryCycles.filter((c) => c.categoryId === category?.id).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("古い「年次請け」は名前を引き継いで改名される", () => {
+    const base = createInitialDocument();
+    const renamed = {
+      ...base,
+      equipmentCategories: base.equipmentCategories.map((c) =>
+        c.name === "保安管理契約外" ? { ...c, name: "年次請け" } : c,
+      ),
+    };
+
+    const parsed = parseDocument(JSON.parse(JSON.stringify(renamed)));
+
+    expect(parsed.equipmentCategories.filter((c) => c.name === "年次請け")).toHaveLength(
+      0,
+    );
+    expect(
+      parsed.equipmentCategories.filter((c) => c.name === "保安管理契約外"),
+    ).toHaveLength(1);
+  });
+
+  it("古い feeBasis / billingCoverage は契約種別に引き継がれる", () => {
+    const base = createInitialDocument();
+    const { doc: saved } = saveCustomer(base, input(base));
+    const legacy = {
+      ...saved,
+      customers: saved.customers.map((c) => {
+        const { contractType: _drop, ...rest } = c;
+        return { ...rest, feeBasis: "perVisit", billingCoverage: "single" };
+      }),
+    };
+
+    const parsed = parseDocument(JSON.parse(JSON.stringify(legacy)));
+    expect(parsed.customers[0].contractType).toBe("external");
   });
 });

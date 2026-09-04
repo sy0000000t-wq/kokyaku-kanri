@@ -79,10 +79,11 @@ export function CustomerForm({
   );
   const [months, setMonths] = useState<number[]>(initial.inspectionMonths);
   const [billingMonths, setBillingMonths] = useState<number[]>(initial.billingMonths);
-  const [billingCoverage, setBillingCoverage] = useState<"period" | "single">(
-    initial.billingCoverage,
+  const [contractType, setContractType] = useState<"hoan" | "external">(
+    initial.contractType,
   );
-  const [feeBasis, setFeeBasis] = useState<"monthly" | "perVisit">(initial.feeBasis);
+  // 料金の積み方と請求の対象期間は、契約種別ひとつで決まる
+  const isExternal = contractType === "external";
   const [dirty, setDirty] = useState(false);
   // 顧客IDは契約年月日から作る。手で書き換えたら以後は追随させない
   const [codeEdited, setCodeEdited] = useState(initial.id != null);
@@ -136,7 +137,7 @@ export function CustomerForm({
     const pricing = calcPricing({
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
       monthlyFeeTaxMode,
-      feeBasis,
+      feeBasis: isExternal ? "perVisit" : "monthly",
       visitsPerYear: months.length,
       annualFeeHandling,
       annualInspectionFee: annualInspectionFee === "" ? null : Number(annualInspectionFee),
@@ -152,7 +153,7 @@ export function CustomerForm({
     facilities,
     monthlyFee,
     monthlyFeeTaxMode,
-    feeBasis,
+    contractType,
     months,
     annualFeeTaxMode,
     annualFeeHandling,
@@ -196,7 +197,7 @@ export function CustomerForm({
       inspectionCycleId,
       monthlyFee: monthlyFee === "" ? 0 : Number(monthlyFee),
       monthlyFeeTaxMode,
-      feeBasis,
+      contractType,
       annualFeeHandling,
       annualInspectionFee:
         annualFeeHandling === "separate" ? toNum(annualInspectionFee) : null,
@@ -223,7 +224,6 @@ export function CustomerForm({
       priorContactNote: fields.priorContactNote,
       switchgearRequestNote: fields.switchgearRequestNote,
       billingCycleId: toNum(fields.billingCycleId),
-      billingCoverage,
       paymentLagMonths: toNum(fields.paymentLagMonths) ?? 1,
       isActive: isActive ? 1 : 0,
       note: fields.note,
@@ -373,23 +373,27 @@ export function CustomerForm({
             />
             <div className="grid gap-3 p-4 sm:grid-cols-2">
               <Field
-                label="料金の決め方"
+                label="契約種別"
                 className="sm:col-span-2"
-                hint="巡回のたびに請求する契約は「1回あたり」。年額は 1回あたり × 通常点検の実施月の数 ＋ 年次点検費 で出します"
+                hint={
+                  isExternal
+                    ? "1回あたりの金額 × 実施回数で年額を出し、実施した月をその月に請求します"
+                    : "月額 × 12ヶ月で年額を出し、請求は対象期間の最終月にまとめます"
+                }
               >
                 <Select
-                  value={feeBasis}
+                  value={contractType}
                   onChange={(e) =>
-                    setFeeBasis(e.target.value as "monthly" | "perVisit")
+                    setContractType(e.target.value as "hoan" | "external")
                   }
                 >
-                  <option value="monthly">月額制（月額 × 12ヶ月）</option>
-                  <option value="perVisit">1回あたり（巡回1回の金額 × 巡回回数）</option>
+                  <option value="hoan">保安管理契約</option>
+                  <option value="external">保安管理契約外</option>
                 </Select>
               </Field>
 
               <Field
-                label={feeBasis === "perVisit" ? "巡回1回あたり（円）" : "月額（円）"}
+                label={isExternal ? "1回あたりの金額（円）" : "月額（円）"}
                 required
                 hint={
                   monthlyFeeTaxMode === "included"
@@ -410,8 +414,8 @@ export function CustomerForm({
                   <Select
                     className="w-24 shrink-0"
                     aria-label={
-                      feeBasis === "perVisit"
-                        ? "巡回1回あたりが税抜か税込か"
+                      isExternal
+                        ? "1回あたりの金額が税抜か税込か"
                         : "月額が税抜か税込か"
                     }
                     value={monthlyFeeTaxMode}
@@ -743,24 +747,6 @@ export function CustomerForm({
               </Field>
 
               <Field
-                label="請求の対象"
-                className="sm:col-span-2"
-                hint="年次請けや不規則な契約は「当月分のみ」。実施した月をその月に請求します"
-              >
-                <Select
-                  value={billingCoverage}
-                  onChange={(e) =>
-                    setBillingCoverage(e.target.value as "period" | "single")
-                  }
-                >
-                  <option value="period">
-                    前回請求の翌月から当月まで（隔月なら2ヶ月分をまとめて）
-                  </option>
-                  <option value="single">当月分のみ（実施した月を請求）</option>
-                </Select>
-              </Field>
-
-              <Field
                 label="請求月"
                 className="sm:col-span-2"
                 hint="請求サイクルを選ぶとプリセットされます。不規則な契約はここで直接選べます"
@@ -773,7 +759,10 @@ export function CustomerForm({
                 <p className="mt-1.5 text-xs text-muted">
                   {billingMonths.length === 0
                     ? "請求月がありません。請求・入金には出てきません。"
-                    : describeBilling(billingMonths, billingCoverage)}
+                    : describeBilling(
+                        billingMonths,
+                        isExternal ? "single" : "period",
+                      )}
                 </p>
               </Field>
             </div>
@@ -812,8 +801,8 @@ export function CustomerForm({
               <Row label="保安管理点数 合計" strong>
                 {formatPoints(preview.total)}
               </Row>
-              {feeBasis === "perVisit" && (
-                <Row label="巡回">
+              {isExternal && (
+                <Row label="実施ぶん">
                   <span className="text-xs text-muted">
                     {formatYen(preview.pricing.visitFeeIncl)} ×{" "}
                     {preview.pricing.visitsPerYear}回 =
@@ -825,10 +814,10 @@ export function CustomerForm({
                   </span>
                 </Row>
               )}
-              <Row label={feeBasis === "perVisit" ? "月額換算 税抜" : "月額税抜"}>
+              <Row label={isExternal ? "月額換算 税抜" : "月額税抜"}>
                 {formatYen(preview.pricing.monthlyExcl)}
               </Row>
-              <Row label={feeBasis === "perVisit" ? "月額換算 税込" : "月額税込"}>
+              <Row label={isExternal ? "月額換算 税込" : "月額税込"}>
                 {formatYen(preview.pricing.monthlyIncl)}
               </Row>
               <Row label="年額税抜">{formatYen(preview.pricing.annualExcl)}</Row>

@@ -11,6 +11,7 @@ import {
   resolveFacilityStartMonth,
 } from "@/lib/calc/schedule";
 import { generateBillingMonths } from "@/lib/calc/billing";
+import { feeBasisOf } from "./document";
 import type {
   AppDocument,
   BillingCycle,
@@ -181,8 +182,8 @@ export function buildCustomerView(
   const pricing = calcPricing({
     monthlyFee: customer.monthlyFee,
     monthlyFeeTaxMode: customer.monthlyFeeTaxMode,
-    feeBasis: customer.feeBasis,
-    // 巡回1回あたりの契約は、通常点検の実施月の数がそのまま巡回回数になる
+    feeBasis: feeBasisOf(customer.contractType),
+    // 保安管理契約外は、通常点検の実施月の数がそのまま実施回数になる
     visitsPerYear: customerInspectionMonths.length,
     annualFeeHandling: customer.annualFeeHandling,
     annualInspectionFee: customer.annualInspectionFee,

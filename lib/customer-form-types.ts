@@ -57,7 +57,7 @@ export type CustomerFormValues = {
   inspectionCycleId: number;
   monthlyFee: number;
   monthlyFeeTaxMode: "excluded" | "included";
-  feeBasis: "monthly" | "perVisit";
+  contractType: "hoan" | "external";
   annualFeeHandling: "included" | "separate";
   annualInspectionFee: number | null;
   annualFeeTaxMode: "excluded" | "included";
@@ -82,7 +82,6 @@ export type CustomerFormValues = {
   switchgearRequestRequired: number;
   switchgearRequestNote: string;
   billingCycleId: number | null;
-  billingCoverage: "period" | "single";
   paymentLagMonths: number;
   isActive: number;
   note: string;
@@ -128,7 +127,7 @@ export function emptyCustomer(
     inspectionCycleId: cycle?.id ?? 0,
     monthlyFee: 0,
     monthlyFeeTaxMode: "excluded",
-    feeBasis: "monthly",
+    contractType: "hoan",
     annualFeeHandling: "included",
     annualInspectionFee: null,
     annualFeeTaxMode: "excluded",
@@ -153,7 +152,6 @@ export function emptyCustomer(
     switchgearRequestRequired: 0,
     switchgearRequestNote: "",
     billingCycleId: masters.billingCycles[0]?.id ?? null,
-    billingCoverage: "period",
     paymentLagMonths: 1,
     isActive: 1,
     note: "",

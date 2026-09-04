@@ -7,6 +7,7 @@ import {
   monthsOverdue,
 } from "@/lib/calc/billing";
 import { addMonths, getInspectionTarget, type YearMonth } from "@/lib/calc/schedule";
+import { billingCoverageOf, feeBasisOf } from "./document";
 import type {
   AppDocument,
   BillingRecord,
@@ -143,12 +144,12 @@ export function buildBillingGrid(
     const coveredMonths = billedMonths(
       customer.billingMonths,
       ym.month,
-      customer.billingCoverage,
+      billingCoverageOf(customer.contractType),
     );
 
     const defaultAmount = calcDefaultBillingAmount({
       monthlyIncl: customer.pricing.monthlyIncl,
-      feeBasis: customer.feeBasis,
+      feeBasis: feeBasisOf(customer.contractType),
       visitFeeIncl: customer.pricing.visitFeeIncl,
       isInspectionMonth: customer.inspectionMonths.includes(ym.month),
       annualFeeHandling: customer.annualFeeHandling,
