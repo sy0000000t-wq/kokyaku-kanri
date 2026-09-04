@@ -232,9 +232,6 @@ export function FacilityRows({
                   ))}
                 </Select>
                 <div className="mt-1 flex flex-wrap gap-1">
-                  {cycle?.requiresInsulationMonitor && (
-                    <Badge tone="warn">絶縁監視装置 必須</Badge>
-                  )}
                   {cycle?.conditionNote && <Badge>{cycle.conditionNote}</Badge>}
                 </div>
               </div>

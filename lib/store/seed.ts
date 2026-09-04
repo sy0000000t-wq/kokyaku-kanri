@@ -80,7 +80,6 @@ export function createInitialDocument(): AppDocument {
         intervalMonths: c.intervalMonths,
         multiplier: c.multiplier ?? null,
         fixedPoints: c.fixedPoints ?? null,
-        requiresInsulationMonitor: c.requiresInsulationMonitor ? 1 : 0,
         conditionNote: c.conditionNote ?? "",
         sortOrder: i,
       });
@@ -152,7 +151,14 @@ export function parseDocument(raw: unknown): AppDocument {
     coefficientRows: list("coefficientRows"),
     ...withAnnualSubcontract(
       list("equipmentCategories") as AppDocument["equipmentCategories"],
-      list("categoryCycles") as AppDocument["categoryCycles"],
+      // 「絶縁監視装置が必須」はやめたので、古いデータからは落とす
+      (list("categoryCycles") as AppDocument["categoryCycles"]).map(
+        ({ ...c }) => {
+          delete (c as { requiresInsulationMonitor?: number })
+            .requiresInsulationMonitor;
+          return c;
+        },
+      ),
     ),
     // 「年次点検のみ」は後から足した周期なので、無ければ補う
     inspectionCycles: withAnnualOnlyCycle(
@@ -269,7 +275,6 @@ function withAnnualSubcontract(
           intervalMonths: 12,
           multiplier: null,
           fixedPoints: null,
-          requiresInsulationMonitor: 0,
           conditionNote: "",
           sortOrder: 0,
         },

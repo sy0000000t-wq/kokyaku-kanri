@@ -88,10 +88,6 @@ export const categoryCycles = sqliteTable("category_cycles", {
   intervalMonths: integer("interval_months").notNull(),
   multiplier: real("multiplier"),
   fixedPoints: real("fixed_points"),
-  /** フロー図の「絶縁監視装置 必須」 */
-  requiresInsulationMonitor: integer("requires_insulation_monitor")
-    .notNull()
-    .default(0),
   /** フロー図の「条件適用」「※固定」などの注記 */
   conditionNote: text("condition_note").notNull().default(""),
   sortOrder: integer("sort_order").notNull().default(0),

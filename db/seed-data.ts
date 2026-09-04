@@ -75,7 +75,6 @@ export type SeedCategoryCycle = {
   intervalMonths: number;
   multiplier?: number;
   fixedPoints?: number;
-  requiresInsulationMonitor?: boolean;
   conditionNote?: string;
 };
 
@@ -114,7 +113,6 @@ export const seedEquipmentCategories: SeedEquipmentCategory[] = [
         name: "3ヶ月に1回",
         intervalMonths: 3,
         fixedPoints: 0.2,
-        requiresInsulationMonitor: true,
         conditionNote: "※固定",
       },
     ],
@@ -166,7 +164,6 @@ export const seedEquipmentCategories: SeedEquipmentCategory[] = [
         name: "2ヶ月に1回",
         intervalMonths: 2,
         multiplier: 0.6,
-        requiresInsulationMonitor: true,
         conditionNote: "条件適用",
       },
     ],

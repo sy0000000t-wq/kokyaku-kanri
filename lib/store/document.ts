@@ -81,7 +81,6 @@ export type CategoryCycle = {
   intervalMonths: number;
   multiplier: number | null;
   fixedPoints: number | null;
-  requiresInsulationMonitor: number;
   conditionNote: string;
   sortOrder: number;
 };

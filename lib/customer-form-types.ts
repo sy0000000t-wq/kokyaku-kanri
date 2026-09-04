@@ -8,7 +8,6 @@ export type FormCategoryCycle = {
   intervalMonths: number;
   multiplier: number | null;
   fixedPoints: number | null;
-  requiresInsulationMonitor: boolean;
   conditionNote: string;
 };
 

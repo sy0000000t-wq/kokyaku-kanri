@@ -95,13 +95,6 @@ describe("換算値算出フロー図：需要設備", () => {
     ).toBe(0.2);
   });
 
-  it("小規模高圧設備の 3ヶ月点検は絶縁監視装置が必須", () => {
-    const seed = seedEquipmentCategories.find(
-      (c) => c.name === "需要設備（高圧・64kVA未満・小規模高圧設備）",
-    )!;
-    expect(seed.cycles[0].requiresInsulationMonitor).toBe(true);
-  });
-
   it("64kVA未満・非常用予備発電設備あり（月1回 0.4 / 2ヶ月 0.24）", () => {
     const name = "需要設備（高圧・64kVA未満・非常用予備発電設備あり）";
     expect(facilityPoints(name, "月1回", 40)).toBe(0.4);

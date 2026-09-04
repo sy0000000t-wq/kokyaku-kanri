@@ -32,7 +32,6 @@ export function toFormMasters(doc: AppDocument, indexes: Indexes): FormMasters {
           intervalMonths: cy.intervalMonths,
           multiplier: cy.multiplier,
           fixedPoints: cy.fixedPoints,
-          requiresInsulationMonitor: !!cy.requiresInsulationMonitor,
           conditionNote: cy.conditionNote,
         })),
       })),

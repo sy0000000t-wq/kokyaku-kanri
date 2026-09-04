@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, CardHeader, Field, Input, Select } from "@/components/ui";
+import { Button, Card, CardHeader, Field, Input, Select } from "@/components/ui";
 import { useStore } from "@/lib/store/context";
 import type {
   CategoryCycle,
@@ -329,6 +329,7 @@ function CycleForm({
 }) {
   const { update, updateWith } = useStore();
   const isTable = category.calculationMethod === "table";
+  const isExcluded = category.calculationMethod === "excluded";
 
   const [name, setName] = useState(cycle?.name ?? "");
   const [intervalMonths, setIntervalMonths] = useState(String(cycle?.intervalMonths ?? 1));
@@ -337,9 +338,6 @@ function CycleForm({
   );
   const [conditionNote, setConditionNote] = useState(cycle?.conditionNote ?? "");
   const [order, setOrder] = useState(String(cycle?.sortOrder ?? sortOrder ?? 0));
-  const [requiresMonitor, setRequiresMonitor] = useState(
-    !!cycle?.requiresInsulationMonitor,
-  );
   const [error, setError] = useState<string | null>(null);
 
   const submit = (e: React.FormEvent) => {
@@ -353,7 +351,8 @@ function CycleForm({
     if (!Number.isFinite(interval) || interval < 0) {
       return setError("実施間隔は 0 以上の整数で入力してください");
     }
-    if (num == null || !Number.isFinite(num)) {
+    // 換算係数を適用しない区分は、倍率も固定点数も点数に効かない
+    if (!isExcluded && (num == null || !Number.isFinite(num))) {
       return setError(isTable ? "倍率が必要です" : "固定点数が必要です");
     }
 
@@ -363,9 +362,8 @@ function CycleForm({
         categoryId: category.id,
         name: name.trim(),
         intervalMonths: interval,
-        multiplier: isTable ? num : null,
-        fixedPoints: isTable ? null : num,
-        requiresInsulationMonitor: requiresMonitor ? 1 : 0,
+        multiplier: isTable && !isExcluded ? num : null,
+        fixedPoints: !isTable && !isExcluded ? num : null,
         conditionNote,
         sortOrder: Number(order) || 0,
       }),
@@ -412,7 +410,8 @@ function CycleForm({
             type="number"
             step="0.001"
             min="0"
-            value={value}
+            value={isExcluded ? "" : value}
+            disabled={isExcluded}
             onChange={(e) => setValue(e.target.value)}
           />
         </Field>
@@ -442,18 +441,7 @@ function CycleForm({
         </div>
       </div>
 
-      <div className="mt-1.5 flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-1.5 text-xs text-muted">
-          <input
-            type="checkbox"
-            checked={requiresMonitor}
-            onChange={(e) => setRequiresMonitor(e.target.checked)}
-          />
-          絶縁監視装置が必須
-        </label>
-        {cycle?.requiresInsulationMonitor ? <Badge tone="warn">必須</Badge> : null}
-        <Status error={error} />
-      </div>
+      <Status error={error} />
     </form>
   );
 }

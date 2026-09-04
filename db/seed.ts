@@ -100,7 +100,6 @@ export function seedMasters(db: DB) {
           intervalMonths: c.intervalMonths,
           multiplier: c.multiplier ?? null,
           fixedPoints: c.fixedPoints ?? null,
-          requiresInsulationMonitor: c.requiresInsulationMonitor ? 1 : 0,
           conditionNote: c.conditionNote ?? "",
           sortOrder: i,
         })),
