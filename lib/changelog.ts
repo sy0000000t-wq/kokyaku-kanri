@@ -11,6 +11,14 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V2.0",
+    date: "2026-09-05",
+    changes: [
+      "「使い方」を足しました。設定手順も運用手順も、アプリの中だけで分かります（図解つき）",
+      "配布元の接続口を使うのをやめました。各自が自分の接続口を設定します",
+    ],
+  },
+  {
     version: "V1.9",
     date: "2026-09-05",
     changes: [

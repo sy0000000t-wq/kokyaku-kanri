@@ -37,7 +37,8 @@ jobs:
         env:
           # プロジェクトサイトはサブパス配下に置かれる
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
-          NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          # Google への接続口は埋め込まない。使う人が自分のものを設定画面で入れる。
+          # 配布元のプロジェクトを誰かに使わせないための決まりごと。
         run: npm run build
 
       - name: Jekyll の処理を止める（_next を配信するため）

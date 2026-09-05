@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Button, Card, CardHeader, Input } from "@/components/ui";
+import Link from "next/link";
 import {
-  BUILT_IN_CLIENT_ID,
   hasOwnClientId,
   loadClientId,
   saveClientId,
@@ -12,8 +12,9 @@ import {
 /**
  * Google への接続口（OAuth クライアントID）をこの端末で決める。
  *
- * 空のままなら配布元の接続口を使う。自分のIDを入れると、
- * Google との通信は自分の枠だけを通り、配布元には一切かからない。
+ * 配布するビルドには接続口を埋め込んでいないので、ここに入れないと
+ * ドライブに接続できない。入れた接続口はその人の Google Cloud のものなので、
+ * Google との通信は必ずその人の枠を通る。
  * ドライブの文書ではなく端末に持つ（文書を読むためにこのIDが要るため）。
  */
 export function ClientIdSetting() {
@@ -37,21 +38,20 @@ export function ClientIdSetting() {
     <Card>
       <CardHeader
         title="Google への接続口（この端末）"
-        description="自分の Google Cloud で作ったクライアントIDを入れると、Google との通信が自分の枠だけを通ります。空のままなら配布元の接続口を使います"
+        description="ドライブに接続するのに必要です。自分の Google Cloud で作ったクライアントIDを入れてください。端末ごとの設定です"
       />
       <div className="space-y-2 p-4">
-        <p className="text-xs text-muted">
-          いま使っているのは
-          <span className="ml-1 font-medium text-ink">
-            {own ? "自分の接続口" : "配布元の接続口"}
-          </span>
-          です。
-          {!own && BUILT_IN_CLIENT_ID === "" && (
-            <span className="ml-1 text-warn">
-              配布元の接続口も未設定なので、ドライブに接続できません。
-            </span>
-          )}
-        </p>
+        {own ? (
+          <p className="text-xs text-ok">この端末には接続口が設定されています。</p>
+        ) : (
+          <p className="rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
+            この端末には接続口が設定されていません。ドライブに接続できないので、
+            データはこの端末の中だけに残ります。
+            <Link href="/help?tab=setup" className="ml-1 underline">
+              作り方を見る
+            </Link>
+          </p>
+        )}
 
         <Input
           value={value}
@@ -62,8 +62,13 @@ export function ClientIdSetting() {
         />
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button size="sm" variant="outline" onClick={apply}>
-            {value.trim() === "" ? "配布元の接続口に戻す" : "この端末で使う"}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={apply}
+            disabled={value.trim() === "" && !own}
+          >
+            {value.trim() === "" ? "設定を消す" : "この端末で使う"}
           </Button>
           {saved && (
             <span className="text-xs text-ok" role="status">

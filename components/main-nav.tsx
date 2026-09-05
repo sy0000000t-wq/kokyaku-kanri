@@ -10,6 +10,7 @@ const links = [
   { href: "/schedule", label: "点検スケジュール" },
   { href: "/billing", label: "請求・入金" },
   { href: "/settings", label: "設定" },
+  { href: "/help", label: "使い方" },
 ];
 
 export function MainNav() {

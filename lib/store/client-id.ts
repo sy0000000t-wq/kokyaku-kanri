@@ -4,12 +4,15 @@
  * 端末ごとに localStorage で持つ。ドライブの文書には入れない。
  * 文書はドライブから読むもので、それを読むためにこのIDが要るため。
  *
- * 何も入れていなければ、ビルド時に埋め込んだ値を使う。
- * 自分のIDを入れれば、Google との通信はその人の枠だけを通る。
+ * 配布するビルドには埋め込まない。使う人が自分の Google Cloud で作った
+ * ものを設定画面から入れる。こうすると Google との通信は必ずその人の枠を通り、
+ * 配布元のプロジェクトには一切かからない。
+ *
+ * 手元で動かして確認するときだけ .env.local から拾う。
  */
 const KEY = "denki-hoan-customer-manager:google-client-id";
 
-/** 配布元が用意している既定の接続口 */
+/** 手元で確認するとき用。配布するビルドでは空 */
 export const BUILT_IN_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
 export function loadClientId(): string {
