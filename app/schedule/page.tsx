@@ -95,10 +95,10 @@ function SchedulePageInner() {
               <table className="w-full min-w-[1080px] text-sm">
                 <thead className="border-b border-line bg-canvas text-xs text-muted">
                   <tr>
-                    <th className="sticky-col left-0 w-[4.5rem] min-w-[4.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
+                    <th className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
                       顧客ID
                     </th>
-                    <th className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
+                    <th className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
                       物件名称
                     </th>
                     <th className="px-2.5 py-2 text-right font-medium">距離</th>
@@ -128,7 +128,7 @@ function SchedulePageInner() {
                       <td className="sticky-col left-0 px-2.5 py-1.5 font-mono text-xs">
                         {c.code}
                       </td>
-                      <td className="sticky-col sticky-col-shadow left-[4.5rem] px-2.5 py-1.5">
+                      <td className="sticky-col sticky-col-shadow left-[6.5rem] px-2.5 py-1.5">
                         <Link
                           href={`/customers/edit?id=${c.id}`}
                           className="font-medium text-brand hover:underline"

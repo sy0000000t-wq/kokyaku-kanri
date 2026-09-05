@@ -14,6 +14,7 @@ import { ColumnPicker } from "@/components/customers/column-picker";
 import { TaxToggle } from "@/components/tax-toggle";
 import {
   COLUMNS,
+  DEFAULT_VISIBLE,
   loadVisibleColumns,
   saveVisibleColumns,
   type ColumnId,
@@ -83,13 +84,25 @@ function CustomersPageInner() {
   const params = useSearchParams();
   const { doc, indexes } = useStore();
 
-  const [visible, setVisible] = useState<ColumnId[]>(loadVisibleColumns);
-  // 端末に憶えておく
-  useEffect(() => saveVisibleColumns(visible), [visible]);
+  // localStorage はサーバー側の描画では読めない。
+  // 最初は既定の列で描き、端末に憶えた内容はあとから当てる（描き分けの食い違いを避ける）
+  const [visible, setVisible] = useState<ColumnId[]>(DEFAULT_VISIBLE);
+  const [columnsLoaded, setColumnsLoaded] = useState(false);
+
+  useEffect(() => {
+    setVisible(loadVisibleColumns());
+    setColumnsLoaded(true);
+  }, []);
+
+  // 端末に憶えておく（読み込む前に既定で上書きしないよう待つ）
+  useEffect(() => {
+    if (columnsLoaded) saveVisibleColumns(visible);
+  }, [visible, columnsLoaded]);
 
   const shownColumns = COLUMNS.filter((c) => visible.includes(c.id));
   // 固定2列 + 選んだ列 + 状態列。横スクロールできる幅を確保する
-  const tableMinWidth = `${28 + shownColumns.length * 9}rem`;
+  // 固定2列（顧客ID 6.5rem ＋ 物件名称 13rem）＋ 表示中の列ぶん
+  const tableMinWidth = `${20 + shownColumns.length * 9}rem`;
 
   const showTaxIncluded = doc.settings.showTaxIncluded;
 
@@ -110,7 +123,7 @@ function CustomersPageInner() {
             {rows.length} 件表示 / 稼働中 {activeCount} 件
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <TaxToggle />
           <ColumnPicker visible={visible} onChange={setVisible} />
           <RecalcDistancesButton />
@@ -139,10 +152,10 @@ function CustomersPageInner() {
             <table className="w-full text-sm" style={{ minWidth: tableMinWidth }}>
               <thead className="border-b border-line bg-canvas text-xs text-muted">
                 <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
-                  <th className="sticky-col left-0 w-[4.5rem] min-w-[4.5rem] whitespace-nowrap">
+                  <th className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] whitespace-nowrap">
                     <SortLink label="顧客ID" sortKey="code" sp={sp} />
                   </th>
-                  <th className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 sm:w-52 sm:min-w-52">
+                  <th className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 sm:w-52 sm:min-w-52">
                     <SortLink label="物件名称" sortKey="name" sp={sp} />
                   </th>
                   {shownColumns.map((col) => (
@@ -174,10 +187,10 @@ function CustomersPageInner() {
                       !c.isActive && "text-muted opacity-70",
                     )}
                   >
-                    <td className="sticky-col left-0 w-[4.5rem] min-w-[4.5rem] px-2.5 py-2 font-mono text-xs whitespace-nowrap">
+                    <td className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 font-mono text-xs whitespace-nowrap">
                       {c.code}
                     </td>
-                    <td className="sticky-col sticky-col-shadow left-[4.5rem] w-40 min-w-40 px-2.5 py-2 sm:w-52 sm:min-w-52">
+                    <td className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 px-2.5 py-2 sm:w-52 sm:min-w-52">
                       <Link
                         href={`/customers/edit?id=${c.id}`}
                         className="font-medium text-brand hover:underline"

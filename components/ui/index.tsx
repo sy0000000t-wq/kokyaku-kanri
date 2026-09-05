@@ -14,6 +14,8 @@ export function buttonClass(
 ) {
   return cn(
     "inline-flex items-center justify-center gap-1.5 rounded-md font-medium transition-colors",
+    // 幅が足りないときは1文字ずつ折り返さず、行ごと折り返させる
+    "whitespace-nowrap",
     "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
     "disabled:pointer-events-none disabled:opacity-50",
     size === "sm" ? "h-8 px-2.5 text-xs" : "h-9 px-3.5 text-sm",

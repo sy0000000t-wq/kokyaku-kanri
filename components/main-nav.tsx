@@ -20,7 +20,9 @@ export function MainNav() {
       <div className="mx-auto flex w-full max-w-[1400px] items-center gap-4 px-3 sm:px-5">
         <Link href="/" className="shrink-0 py-3 text-sm font-semibold">
           電気保安管理
-          <span className="ml-1.5 text-xs font-normal text-muted">顧客管理</span>
+          <span className="ml-1.5 hidden text-xs font-normal text-muted sm:inline">
+            顧客管理
+          </span>
         </Link>
         <nav className="-mb-px flex flex-1 gap-0.5 overflow-x-auto">
           {links.map((link) => {
