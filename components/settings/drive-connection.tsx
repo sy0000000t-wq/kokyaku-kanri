@@ -53,9 +53,8 @@ export function DriveConnection() {
         {!driveAvailable && (
           <p className="rounded-md bg-warn-soft px-3 py-2 text-xs text-warn">
             Google のクライアントIDが未設定のため、ドライブに接続できません。
-            <code className="mx-1 font-mono">.env.local</code>の
-            <code className="mx-1 font-mono">NEXT_PUBLIC_GOOGLE_CLIENT_ID</code>
-            を設定してください。
+            下の「Google への接続口」に、自分の Google Cloud で作った
+            クライアントIDを入れてください。
           </p>
         )}
 

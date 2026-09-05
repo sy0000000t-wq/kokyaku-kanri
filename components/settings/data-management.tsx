@@ -8,6 +8,7 @@ import { renameCustomerCodePrefix } from "@/lib/store/mutations";
 import { parseDocument } from "@/lib/store/seed";
 import { getCustomerViews } from "@/lib/store/selectors";
 import { formatDateTime, summarizeFacility, todayIso } from "@/lib/utils";
+import { ClientIdSetting } from "./client-id-setting";
 import { DriveConnection } from "./drive-connection";
 
 /** データ管理：書き出しと取り込み */
@@ -158,6 +159,7 @@ export function DataManagement() {
   return (
     <div className="space-y-4">
       <DriveConnection />
+      <ClientIdSetting />
 
       <Card>
         <CardHeader title="エクスポート" description="ブラウザにダウンロードされます" />

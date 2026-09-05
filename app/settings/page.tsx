@@ -8,6 +8,7 @@ import { BasicSettings } from "@/components/settings/basic-settings";
 import { CategoryEditor } from "@/components/settings/category-editor";
 import { CoefficientEditor } from "@/components/settings/coefficient-editor";
 import { FocusEditor } from "@/components/settings/focus-editor";
+import { ChangelogView } from "@/components/settings/changelog-view";
 import { DataManagement } from "@/components/settings/data-management";
 import {
   BillingCycleEditor,
@@ -25,6 +26,7 @@ const TABS = [
   { id: "coefficient", label: "換算係数" },
   { id: "focus", label: "重点実施項目" },
   { id: "data", label: "データ管理" },
+  { id: "changelog", label: "更新履歴" },
 ] as const;
 
 function SettingsPageInner() {
@@ -84,6 +86,7 @@ function SettingsPageInner() {
       )}
       {tab === "focus" && <FocusEditor />}
       {tab === "data" && <DataManagement />}
+      {tab === "changelog" && <ChangelogView />}
     </div>
   );
 }

@@ -20,8 +20,9 @@ import {
 import { DriveBackend } from "./drive-backend";
 import { clearMirror } from "./offline";
 import { GoogleAuth } from "./google-auth";
+import { loadClientId } from "./client-id";
 
-const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+
 /** 前回ドライブに繋いでいたかどうか。次回は黙って繋ぎ直す */
 const DRIVE_FLAG = "denki-hoan-customer-manager:use-drive";
 
@@ -88,6 +89,8 @@ export function StoreProvider({
   const authRef = useRef<GoogleAuth | null>(null);
   const backendRef = useRef<DocumentBackend>(backend ?? localBackend.current);
   const [driveConnected, setDriveConnected] = useState(false);
+  // 接続口は端末ごとに持つ。サーバー側の描画では読めないので、開いてから確かめる
+  const [driveAvailable, setDriveAvailable] = useState(false);
   const [doc, setDoc] = useState<AppDocument>(() => createInitialDocument());
   const [status, setStatus] = useState<StoreStatus>("loading");
   const [message, setMessage] = useState<string | null>(null);
@@ -109,14 +112,16 @@ export function StoreProvider({
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const clientId = loadClientId();
+      if (!cancelled) setDriveAvailable(clientId !== "");
       const wantsDrive =
-        CLIENT_ID !== "" && window.localStorage.getItem(DRIVE_FLAG) === "1";
+        clientId !== "" && window.localStorage.getItem(DRIVE_FLAG) === "1";
 
       if (wantsDrive) {
         // ここでトークンを取りに行かない。圏外だと必ず失敗し、
         // ドライブ接続そのものを諦めてしまうため。
         // トークンは実際に通信するときに取り、失敗したら端末内の控えで開く。
-        const auth = new GoogleAuth(CLIENT_ID);
+        const auth = new GoogleAuth(clientId);
         authRef.current = auth;
         backendRef.current = new DriveBackend(auth);
         if (!cancelled) setDriveConnected(true);
@@ -351,7 +356,8 @@ export function StoreProvider({
    * 向こうにファイルがあればそれを読み込み、無ければ今の内容で作る。
    */
   const connectDrive = useCallback(async () => {
-    if (!CLIENT_ID) {
+    const clientId = loadClientId();
+    if (!clientId) {
       setStatus("error");
       setMessage("Google のクライアントIDが設定されていません");
       return;
@@ -361,7 +367,7 @@ export function StoreProvider({
     setMessage(null);
 
     try {
-      const auth = authRef.current ?? new GoogleAuth(CLIENT_ID);
+      const auth = authRef.current ?? new GoogleAuth(clientId);
       const drive = new DriveBackend(auth);
       await drive.ensureSignedIn();
 
@@ -459,7 +465,7 @@ export function StoreProvider({
       keepLocal,
       hasPendingChanges: pendingRef.current != null,
       replace,
-      driveAvailable: CLIENT_ID !== "",
+      driveAvailable,
       driveConnected,
       connectDrive,
       disconnectDrive,
@@ -475,6 +481,7 @@ export function StoreProvider({
       takeRemote,
       keepLocal,
       replace,
+      driveAvailable,
       driveConnected,
       connectDrive,
       disconnectDrive,

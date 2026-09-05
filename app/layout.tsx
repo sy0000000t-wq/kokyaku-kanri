@@ -7,6 +7,7 @@ import { StoreProvider } from "@/lib/store/context";
 import { ServiceWorkerRegistration } from "@/components/service-worker";
 import { StoreStatusBar } from "@/components/store-status-bar";
 import { APP_VERSION } from "@/lib/version";
+import { UpdateNotice } from "@/components/update-notice";
 
 export const metadata: Metadata = {
   title: "顧客管理 | 電気保安管理",
@@ -33,6 +34,7 @@ export default function RootLayout({
         <StoreProvider>
           <ToastProvider>
             <MainNav />
+            <UpdateNotice />
             <StoreStatusBar />
             <main className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-5 sm:py-6">
               {children}
