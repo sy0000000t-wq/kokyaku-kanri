@@ -11,6 +11,15 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.12",
+    date: "2026-09-07",
+    changes: [
+      "「この端末の変更を送る」「ドライブの内容を取り込む」の前に確認を出すようにしました",
+      "JSON インポートの前にも確認を出し、ファイルの中身と件数を見せるようにしました",
+      "請求月を持たない古い控えを取り込もうとしたときに、先に知らせるようにしました",
+    ],
+  },
+  {
     version: "V1.11",
     date: "2026-09-07",
     changes: [

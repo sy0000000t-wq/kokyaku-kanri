@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { Button, Card, CardHeader, Input } from "@/components/ui";
 import { downloadFile, toCsv } from "@/lib/csv";
 import { useStore } from "@/lib/store/context";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import type { AppDocument } from "@/lib/store/document";
 import { renameCustomerCodePrefix } from "@/lib/store/mutations";
 import { parseDocument } from "@/lib/store/seed";
 import { getCustomerViews } from "@/lib/store/selectors";
@@ -20,6 +22,11 @@ export function DataManagement() {
   const [prefixFrom, setPrefixFrom] = useState("");
   const [prefixTo, setPrefixTo] = useState("");
   const [prefixMessage, setPrefixMessage] = useState<string | null>(null);
+  const [pending, setPending] = useState<{
+    doc: AppDocument;
+    name: string;
+    hadBillingMonths: boolean;
+  } | null>(null);
 
   // 実行前に、いくつ変わるのかを見せる
   const prefixHits = prefixFrom.trim()
@@ -140,11 +147,27 @@ export function DataManagement() {
     downloadFile(`顧客マスタ_${todayIso()}.csv`, csv, "text/csv");
   };
 
-  const importJson = async (file: File) => {
+  /** 取り込むと今の内容は消えるので、中身を見せてから確かめる */
+  const inspectImport = async (file: File) => {
     setMessage(null);
     setError(null);
     try {
-      const next = parseDocument(JSON.parse(await file.text()));
+      const raw = JSON.parse(await file.text()) as Record<string, unknown>;
+      // 読み込むと足りない項目は補われてしまうので、生の中身で古さを見る
+      const hadBillingMonths = Array.isArray(raw.customerBillingMonths);
+      const next = parseDocument(raw);
+      setPending({ doc: next, name: file.name, hadBillingMonths });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  };
+
+  const importJson = async (next: AppDocument) => {
+    setMessage(null);
+    setError(null);
+    try {
       replace(next);
       setMessage(
         `顧客 ${next.customers.length} 件、点検実績 ${next.inspectionRecords.length} 件、請求実績 ${next.billingRecords.length} 件を取り込みました`,
@@ -192,7 +215,7 @@ export function DataManagement() {
             className="h-auto max-w-xs py-1.5"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) void importJson(file);
+              if (file) void inspectImport(file);
             }}
           />
           {message && (
@@ -259,6 +282,45 @@ export function DataManagement() {
           )}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={pending !== null}
+        title="取り込むと、いまのデータはすべて置き換わります"
+        danger="いま入っている顧客・実績・設定はすべて消えて、ファイルの内容に入れ替わります。一部だけ戻すことはできません。"
+        detail={
+          pending && (
+            <>
+              <p>
+                <span className="font-mono">{pending.name}</span> の中身：顧客{" "}
+                {pending.doc.customers.length} 件、点検実績{" "}
+                {pending.doc.inspectionRecords.length} 件、請求実績{" "}
+                {pending.doc.billingRecords.length} 件
+              </p>
+              <p className="mt-1.5">
+                いまは顧客 {doc.customers.length} 件、点検実績{" "}
+                {doc.inspectionRecords.length} 件、請求実績{" "}
+                {doc.billingRecords.length} 件です。
+              </p>
+              {!pending.hadBillingMonths && (
+                <p className="mt-1.5 rounded-md bg-warn-soft px-2.5 py-1.5 text-warn">
+                  このファイルには請求月の設定が入っていません（請求月を持つ前の古い控えです）。
+                  取り込むと、請求月は請求サイクルからの自動割り当てに戻ります。
+                </p>
+              )}
+              <p className="mt-1.5">
+                迷ったら「いいえ」を押し、先に JSON 一括エクスポートで今の控えを取ってください。
+              </p>
+            </>
+          )
+        }
+        confirmLabel="はい、置き換える"
+        onConfirm={() => {
+          const next = pending?.doc;
+          setPending(null);
+          if (next) void importJson(next);
+        }}
+        onCancel={() => setPending(null)}
+      />
 
       <Card>
         <CardHeader title="いまのデータ" />
