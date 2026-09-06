@@ -11,7 +11,16 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "V2.0",
+    version: "V1.11",
+    date: "2026-09-07",
+    changes: [
+      "接続口が未設定のとき、空の画面ではなく「読み込めていません」と知らせるようにしました",
+      "その状態では保存を止めます（ドライブ側と食い違わせないため）",
+      "V1.10 で番号を繰り上げてしまったのを V1.x に戻しました",
+    ],
+  },
+  {
+    version: "V1.10",
     date: "2026-09-05",
     changes: [
       "「使い方」を足しました。設定手順も運用手順も、アプリの中だけで分かります（図解つき）",

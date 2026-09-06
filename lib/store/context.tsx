@@ -60,6 +60,8 @@ type StoreValue = {
   replace: (doc: AppDocument) => void;
   /** Google のクライアントIDが設定されているか */
   driveAvailable: boolean;
+  /** 接続口が無く、ドライブのデータを読めていない */
+  needsClientId: boolean;
   /** いまドライブに繋がっているか */
   driveConnected: boolean;
   /** ドライブに繋ぐ。初回はファイルを作り、いまの内容を引き継ぐ */
@@ -91,6 +93,8 @@ export function StoreProvider({
   const [driveConnected, setDriveConnected] = useState(false);
   // 接続口は端末ごとに持つ。サーバー側の描画では読めないので、開いてから確かめる
   const [driveAvailable, setDriveAvailable] = useState(false);
+  /** 前はドライブに繋いでいたのに、接続口が無くなっている状態 */
+  const [needsClientId, setNeedsClientId] = useState(false);
   const [doc, setDoc] = useState<AppDocument>(() => createInitialDocument());
   const [status, setStatus] = useState<StoreStatus>("loading");
   const [message, setMessage] = useState<string | null>(null);
@@ -107,6 +111,7 @@ export function StoreProvider({
    * ここで保存すると保存先を空で上書きしてしまう。
    */
   const readyRef = useRef(false);
+  const needsClientIdRef = useRef(false);
 
   // 初回読み込み。前回ドライブを使っていたら、画面を出さずに繋ぎ直す
   useEffect(() => {
@@ -114,8 +119,24 @@ export function StoreProvider({
     (async () => {
       const clientId = loadClientId();
       if (!cancelled) setDriveAvailable(clientId !== "");
-      const wantsDrive =
-        clientId !== "" && window.localStorage.getItem(DRIVE_FLAG) === "1";
+      const wasConnected = window.localStorage.getItem(DRIVE_FLAG) === "1";
+
+      // 前はドライブに繋いでいたのに接続口が無い状態。
+      // ここで端末の控えを「正」として開くと、中身が空に見えるうえ、
+      // そのまま入力されるとドライブ側と食い違う。読まずに止める。
+      if (!clientId && wasConnected) {
+        if (!cancelled) {
+          needsClientIdRef.current = true;
+          setNeedsClientId(true);
+          setStatus("error");
+          setMessage(
+            "Google への接続口が設定されていないため、ドライブのデータを読み込めていません。データは消えていません。",
+          );
+        }
+        return;
+      }
+
+      const wantsDrive = clientId !== "" && wasConnected;
 
       if (wantsDrive) {
         // ここでトークンを取りに行かない。圏外だと必ず失敗し、
@@ -243,6 +264,9 @@ export function StoreProvider({
         console.warn("読み込みが終わるまで保存しません");
         return;
       }
+      // 接続口が無い状態では、ドライブの内容と食い違う変更を溜めない
+      if (needsClientIdRef.current) return;
+
       pendingRef.current = next;
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => void flush(), SAVE_DEBOUNCE_MS);
@@ -466,6 +490,7 @@ export function StoreProvider({
       hasPendingChanges: pendingRef.current != null,
       replace,
       driveAvailable,
+      needsClientId,
       driveConnected,
       connectDrive,
       disconnectDrive,
@@ -482,6 +507,7 @@ export function StoreProvider({
       keepLocal,
       replace,
       driveAvailable,
+      needsClientId,
       driveConnected,
       connectDrive,
       disconnectDrive,
