@@ -8,6 +8,7 @@ import {
   isBillingTarget,
   isPaymentOverdue,
   monthsOverdue,
+  suggestBillingMonths,
 } from "@/lib/calc/billing";
 
 describe("isBillingTarget §4.5", () => {
@@ -305,5 +306,58 @@ describe("当月分のみの請求（年次請け・不規則な物件）", () =
     expect(
       calcDefaultBillingAmount({ ...base, targetMonth: 2, coveredMonthCount: 1 }),
     ).toBe(49500);
+  });
+});
+
+describe("suggestBillingMonths：請求月の候補", () => {
+  const base = {
+    contractStartMonth: 4,
+    billingIntervalMonths: 1,
+    inspectionMonths: [5, 8, 11],
+    annualInspectionMonth: 2,
+    annualFeeHandling: "separate" as const,
+  };
+
+  it("保安管理契約は請求サイクルどおり", () => {
+    // 4月契約の隔月は、4・5月分を5月に請求するので奇数月
+    expect(
+      suggestBillingMonths({ ...base, contractType: "hoan", billingIntervalMonths: 2 }),
+    ).toEqual([1, 3, 5, 7, 9, 11]);
+  });
+
+  it("保安管理契約外は、実施月と別途請求の年次点検月だけ", () => {
+    // 料金が出ない月まで請求月にしても、請求額 0 円が並ぶだけ
+    expect(suggestBillingMonths({ ...base, contractType: "annual" })).toEqual([2, 5, 8, 11]);
+    expect(suggestBillingMonths({ ...base, contractType: "other" })).toEqual([2, 5, 8, 11]);
+  });
+
+  it("年次点検費が月額に含むなら、年次点検月は足さない", () => {
+    expect(
+      suggestBillingMonths({
+        ...base,
+        contractType: "annual",
+        annualFeeHandling: "included",
+      }),
+    ).toEqual([5, 8, 11]);
+  });
+
+  it("年次請け（通常点検なし）は年次点検月だけ", () => {
+    expect(
+      suggestBillingMonths({
+        ...base,
+        contractType: "annual",
+        inspectionMonths: [],
+      }),
+    ).toEqual([2]);
+  });
+
+  it("実施月と年次点検月が重なっても1つにまとまる", () => {
+    expect(
+      suggestBillingMonths({
+        ...base,
+        contractType: "annual",
+        inspectionMonths: [2, 8],
+      }),
+    ).toEqual([2, 8]);
   });
 });

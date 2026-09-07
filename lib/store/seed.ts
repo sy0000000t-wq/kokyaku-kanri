@@ -4,7 +4,7 @@ import {
   seedEquipmentCategories,
   seedInspectionCycles,
 } from "@/db/seed-data";
-import { generateBillingMonths } from "@/lib/calc/billing";
+import { suggestBillingMonths } from "@/lib/calc/billing";
 import { parseYearMonth } from "@/lib/calc/schedule";
 import type { AppDocument } from "./document";
 
@@ -144,6 +144,43 @@ export function parseDocument(raw: unknown): AppDocument {
   const list = <K extends keyof AppDocument>(key: K): AppDocument[K] =>
     (Array.isArray(d[key]) ? d[key] : base[key]) as AppDocument[K];
 
+  // 項目を後から増やしているので、古いデータには既定値を補う
+  const customers: AppDocument["customers"] = (
+    list("customers") as AppDocument["customers"]
+  ).map((c) => ({
+    ...c,
+    // 以前は月額と年次点検費でひとつの設定だった。無ければ税抜として扱う
+    monthlyFeeTaxMode:
+      c.monthlyFeeTaxMode ??
+      (c as { feeTaxMode?: "excluded" | "included" }).feeTaxMode ??
+      "excluded",
+    annualFeeTaxMode:
+      c.annualFeeTaxMode ??
+      (c as { feeTaxMode?: "excluded" | "included" }).feeTaxMode ??
+      "excluded",
+    annualAvailability: c.annualAvailability ?? "unspecified",
+    annualAvailabilityNote: c.annualAvailabilityNote ?? "",
+    priorContactRequired: c.priorContactRequired ?? 0,
+    priorContactNote: c.priorContactNote ?? "",
+    switchgearRequestRequired: c.switchgearRequestRequired ?? 0,
+    switchgearRequestNote: c.switchgearRequestNote ?? "",
+    // 料金の積み方と請求の対象期間は、契約種別ひとつにまとめた
+    contractType: (() => {
+      // 以前は保安管理契約外をひとまとめに external と呼んでいた
+      if (c.contractType === ("external" as string)) return "annual" as const;
+      if (c.contractType) return c.contractType;
+
+      // さらに前は料金の決め方と請求の対象期間を別々に持っていた
+      const old = c as unknown as {
+        feeBasis?: string;
+        billingCoverage?: string;
+      };
+      return old.feeBasis === "perVisit" || old.billingCoverage === "single"
+        ? ("annual" as const)
+        : ("hoan" as const);
+    })(),
+  }));
+
   // settings は SQLite 版では配列だった
   const rawSettings = Array.isArray(d.settings) ? d.settings[0] : d.settings;
 
@@ -170,41 +207,7 @@ export function parseDocument(raw: unknown): AppDocument {
       list("inspectionCycles") as AppDocument["inspectionCycles"],
     ),
     billingCycles: list("billingCycles"),
-    // 項目を後から増やしているので、古いデータには既定値を補う
-    customers: (list("customers") as AppDocument["customers"]).map((c) => ({
-      ...c,
-      // 以前は月額と年次点検費でひとつの設定だった。無ければ税抜として扱う
-      monthlyFeeTaxMode:
-        c.monthlyFeeTaxMode ??
-        (c as { feeTaxMode?: "excluded" | "included" }).feeTaxMode ??
-        "excluded",
-      annualFeeTaxMode:
-        c.annualFeeTaxMode ??
-        (c as { feeTaxMode?: "excluded" | "included" }).feeTaxMode ??
-        "excluded",
-      annualAvailability: c.annualAvailability ?? "unspecified",
-      annualAvailabilityNote: c.annualAvailabilityNote ?? "",
-      priorContactRequired: c.priorContactRequired ?? 0,
-      priorContactNote: c.priorContactNote ?? "",
-      switchgearRequestRequired: c.switchgearRequestRequired ?? 0,
-      switchgearRequestNote: c.switchgearRequestNote ?? "",
-      // これまでは期間ぶんをまとめる前提だったので、既定はそのまま
-      // 料金の積み方と請求の対象期間は、契約種別ひとつにまとめた
-      contractType: (() => {
-        // 以前は保安管理契約外をひとまとめに external と呼んでいた
-        if (c.contractType === ("external" as string)) return "annual" as const;
-        if (c.contractType) return c.contractType;
-
-        // さらに前は料金の決め方と請求の対象期間を別々に持っていた
-        const old = c as unknown as {
-          feeBasis?: string;
-          billingCoverage?: string;
-        };
-        return old.feeBasis === "perVisit" || old.billingCoverage === "single"
-          ? ("annual" as const)
-          : ("hoan" as const);
-      })(),
-    })),
+    customers,
     // 設備ごとの点検開始月は後から足したので、無ければ顧客に合わせる（null）
     customerFacilities: (list("customerFacilities") as AppDocument["customerFacilities"]).map(
       (f) => ({ ...f, startMonth: f.startMonth ?? null }),
@@ -214,8 +217,9 @@ export function parseDocument(raw: unknown): AppDocument {
     customerBillingMonths: Array.isArray(d.customerBillingMonths)
       ? (d.customerBillingMonths as AppDocument["customerBillingMonths"])
       : billingMonthsFromCycle(
-          list("customers") as AppDocument["customers"],
+          customers,
           list("billingCycles") as AppDocument["billingCycles"],
+          list("customerInspectionMonths") as AppDocument["customerInspectionMonths"],
         ),
     // 報告書提出と応援依頼は後から足したので、既定値を補う
     inspectionRecords: (list("inspectionRecords") as AppDocument["inspectionRecords"]).map(
@@ -323,18 +327,29 @@ function withExternalCategory(
 }
 
 /**
- * 請求月を持っていない古いデータのために、
- * 契約開始月と請求サイクルから、これまでと同じ請求月を起こす。
+ * 請求月を持っていない古いデータのために、契約から請求月を起こす。
+ *
+ * 保安管理契約は請求サイクルどおり。
+ * 保安管理契約外は実施した月にしか料金が出ないので、
+ * 通常点検の実施月と、別途請求の年次点検月だけにする。
+ * 一律に請求サイクルを当てると、請求額 0 円の月が並んでしまう。
  */
 function billingMonthsFromCycle(
   customers: AppDocument["customers"],
   billingCycles: AppDocument["billingCycles"],
+  inspectionMonths: AppDocument["customerInspectionMonths"],
 ): AppDocument["customerBillingMonths"] {
   return customers.flatMap((c) => {
     const cycle = billingCycles.find((b) => b.id === c.billingCycleId);
-    const startMonth = parseYearMonth(c.contractStartDate)?.month ?? 1;
-    return generateBillingMonths(startMonth, cycle?.intervalMonths ?? 1).map(
-      (month) => ({ customerId: c.id, month }),
-    );
+    return suggestBillingMonths({
+      contractType: c.contractType,
+      contractStartMonth: parseYearMonth(c.contractStartDate)?.month ?? 1,
+      billingIntervalMonths: cycle?.intervalMonths ?? 1,
+      inspectionMonths: inspectionMonths
+        .filter((m) => m.customerId === c.id)
+        .map((m) => m.month),
+      annualInspectionMonth: c.annualInspectionMonth,
+      annualFeeHandling: c.annualFeeHandling,
+    }).map((month) => ({ customerId: c.id, month }));
   });
 }

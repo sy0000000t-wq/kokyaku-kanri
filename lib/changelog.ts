@@ -11,6 +11,14 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.13",
+    date: "2026-09-07",
+    changes: [
+      "保安管理契約外の請求月は、点検した月と年次点検月だけをプリセットするようにしました",
+      "請求額が 0 円になる月があると知らせ、その場で外せるようにしました",
+    ],
+  },
+  {
     version: "V1.12",
     date: "2026-09-07",
     changes: [

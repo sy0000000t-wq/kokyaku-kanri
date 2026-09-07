@@ -1,5 +1,5 @@
 import type { FeeBasis } from "./pricing";
-import type { BillingCoverage } from "@/lib/store/document";
+import type { BillingCoverage, ContractType } from "@/lib/store/document";
 import { roundYen } from "./round";
 import {
   addMonths,
@@ -78,6 +78,38 @@ export function formatBilledMonths(coveredMonths: number[]): string {
   if (coveredMonths.length === 0) return "";
   if (coveredMonths.length <= 3) return `${coveredMonths.join("・")}月分`;
   return `${coveredMonths[0]}〜${coveredMonths[coveredMonths.length - 1]}月分`;
+}
+
+export type SuggestBillingMonthsInput = {
+  contractType: ContractType;
+  contractStartMonth: number;
+  /** 請求サイクルの間隔（保安管理契約のとき使う） */
+  billingIntervalMonths: number;
+  /** 通常点検の実施月（保安管理契約外のとき使う） */
+  inspectionMonths: number[];
+  annualInspectionMonth: number | null;
+  annualFeeHandling: "included" | "separate";
+};
+
+/**
+ * 請求月の候補を出す。
+ *
+ * 保安管理契約は月額なので、請求サイクルどおりの月に立つ。
+ * 保安管理契約外は実施した月にしか料金が発生しないので、
+ * 通常点検の実施月と、別途請求の年次点検月だけを候補にする。
+ * ここで金額の中身は見ない（入力の途中で候補が消えないようにするため）。
+ */
+export function suggestBillingMonths(input: SuggestBillingMonthsInput): number[] {
+  if (input.contractType === "hoan") {
+    return generateBillingMonths(input.contractStartMonth, input.billingIntervalMonths);
+  }
+
+  const months = new Set(input.inspectionMonths.map(normalizeMonth));
+  // 年次点検費を別途請求するなら、その月にも請求が立つ
+  if (input.annualFeeHandling === "separate" && input.annualInspectionMonth != null) {
+    months.add(normalizeMonth(input.annualInspectionMonth));
+  }
+  return [...months].sort((a, b) => a - b);
 }
 
 export type BillingTargetInput = ContractLike & {

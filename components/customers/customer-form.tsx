@@ -23,8 +23,9 @@ import {
 import { calcPricing } from "@/lib/calc/pricing";
 import {
   billedMonths,
+  calcDefaultBillingAmount,
   formatBilledMonths,
-  generateBillingMonths,
+  suggestBillingMonths,
 } from "@/lib/calc/billing";
 import { generateCycleMonths, parseYearMonth } from "@/lib/calc/schedule";
 import type {
@@ -173,12 +174,52 @@ export function CustomerForm({
     setMonths(generateCycleMonths(startMonth, c.intervalMonths));
   };
 
-  /** 請求サイクルから請求月をプリセットする（こちらも手修正が最終的な正） */
-  const presetBillingMonths = (cycleId: number | null, startDate: string) => {
+  /** 請求月のうち、既定の請求額が 0 円になる月 */
+  const zeroMonths = billingMonths.filter((m) => {
+    const covered = billedMonths(billingMonths, m, isExternal ? "single" : "period");
+    return (
+      calcDefaultBillingAmount({
+        monthlyIncl: preview.pricing.monthlyIncl,
+        feeBasis: isExternal ? "perVisit" : "monthly",
+        visitFeeIncl: preview.pricing.visitFeeIncl,
+        isInspectionMonth: months.includes(m),
+        annualFeeHandling,
+        annualInspectionFeeIncl: preview.pricing.annualInspectionFeeIncl,
+        annualInspectionMonth:
+          fields.annualInspectionMonth.trim() === ""
+            ? null
+            : Number(fields.annualInspectionMonth),
+        targetMonth: m,
+        coveredMonthCount: covered.length,
+      }) === 0
+    );
+  });
+
+  /**
+   * 請求月をプリセットする（手修正が最終的な正）。
+   * 保安管理契約外は、料金が発生しない月まで請求月にしても仕方がないので、
+   * 実施月と別途請求の年次点検月だけを候補にする。
+   */
+  const presetBillingMonths = (
+    cycleId: number | null,
+    startDate: string,
+    type: "hoan" | "annual" | "other" = contractType,
+    visitMonths: number[] = months,
+  ) => {
     const c = masters.billingCycles.find((x) => x.id === cycleId);
-    if (!c) return;
-    const startMonth = parseYearMonth(startDate)?.month ?? 1;
-    setBillingMonths(generateBillingMonths(startMonth, c.intervalMonths));
+    setBillingMonths(
+      suggestBillingMonths({
+        contractType: type,
+        contractStartMonth: parseYearMonth(startDate)?.month ?? 1,
+        billingIntervalMonths: c?.intervalMonths ?? 1,
+        inspectionMonths: visitMonths,
+        annualInspectionMonth:
+          fields.annualInspectionMonth.trim() === ""
+            ? null
+            : Number(fields.annualInspectionMonth),
+        annualFeeHandling,
+      }),
+    );
   };
 
   // §9 未保存離脱時の確認
@@ -390,6 +431,11 @@ export function CustomerForm({
                   onChange={(e) => {
                     const next = e.target.value as ContractType;
                     setContractType(next);
+                    presetBillingMonths(
+                      Number(fields.billingCycleId),
+                      contractStartDate,
+                      next,
+                    );
                     // 顧客IDを手で決めていなければ、接頭辞も付け替える
                     if (!codeEdited) {
                       const suggested = suggestCustomerCode(
@@ -787,6 +833,30 @@ export function CustomerForm({
                         isExternal ? "single" : "period",
                       )}
                 </p>
+
+                {/* 料金が発生しない月まで請求月にしても仕方がないので、その場で外せるようにする */}
+                {zeroMonths.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 rounded-md bg-warn-soft px-2.5 py-2">
+                    <p className="flex-1 text-xs text-warn">
+                      {zeroMonths.join("・")}月は請求額が 0 円になります。
+                      {isExternal
+                        ? "この月には点検も年次点検費もありません。"
+                        : "月額が 0 円のためです。"}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setBillingMonths((prev) =>
+                          prev.filter((m) => !zeroMonths.includes(m)),
+                        )
+                      }
+                    >
+                      0 円の月を外す
+                    </Button>
+                  </div>
+                )}
               </Field>
             </div>
           </Card>
