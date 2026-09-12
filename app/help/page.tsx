@@ -8,6 +8,7 @@ import { BackupHelp } from "@/components/help/backup";
 import { BillingHelp } from "@/components/help/billing";
 import { CustomersHelp } from "@/components/help/customers";
 import { Overview } from "@/components/help/overview";
+import { OwnCopyHelp } from "@/components/help/own-copy";
 import { ScheduleHelp } from "@/components/help/schedule";
 import { Setup } from "@/components/help/setup";
 import { ShareHelp } from "@/components/help/share";
@@ -22,6 +23,7 @@ const TABS = [
   { id: "billing", label: "請求・入金" },
   { id: "backup", label: "バックアップ" },
   { id: "share", label: "配る・更新する" },
+  { id: "own", label: "自分用のコピー" },
 ] as const;
 
 function HelpPageInner() {
@@ -63,6 +65,7 @@ function HelpPageInner() {
       {tab === "billing" && <BillingHelp />}
       {tab === "backup" && <BackupHelp />}
       {tab === "share" && <ShareHelp />}
+      {tab === "own" && <OwnCopyHelp />}
     </div>
   );
 }

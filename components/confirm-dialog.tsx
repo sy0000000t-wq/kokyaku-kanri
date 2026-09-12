@@ -18,6 +18,7 @@ export function ConfirmDialog({
   cancelLabel = "いいえ（やめる）",
   onConfirm,
   onCancel,
+  extraAction,
 }: {
   open: boolean;
   title: string;
@@ -28,6 +29,8 @@ export function ConfirmDialog({
   cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
+  /** 主でも取消でもない三つめの道（「控えなしで進む」など） */
+  extraAction?: { label: string; onClick: () => void };
 }) {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -78,6 +81,15 @@ export function ConfirmDialog({
           >
             {cancelLabel}
           </button>
+          {extraAction && (
+            <button
+              type="button"
+              className={buttonClass("ghost", "sm")}
+              onClick={extraAction.onClick}
+            >
+              {extraAction.label}
+            </button>
+          )}
           <button
             type="button"
             className={buttonClass("danger", "sm")}

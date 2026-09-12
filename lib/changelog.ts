@@ -11,6 +11,16 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.14",
+    date: "2026-09-12",
+    changes: [
+      "更新するかどうかを選べるようにしました（あとで／この版のまま使う）",
+      "更新の前に、いまのデータの控えを保存するようにしました",
+      "設定 → 更新履歴から、いつでも更新の確認ができるようにしました",
+      "使い方に「自分用のコピー」を足しました（自分で持って育てたい人向け）",
+    ],
+  },
+  {
     version: "V1.13",
     date: "2026-09-07",
     changes: [
