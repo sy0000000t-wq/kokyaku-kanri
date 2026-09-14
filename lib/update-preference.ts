@@ -54,9 +54,27 @@ export function isSnoozed(now = Date.now()): boolean {
   return Number.isFinite(until) && until > now;
 }
 
+/** "V1.16" → [1, 16]。読めなければ null */
+function parseVersion(version: string): number[] | null {
+  const m = /^V?(\d+)\.(\d+)$/.exec(version.trim());
+  return m ? [Number(m[1]), Number(m[2])] : null;
+}
+
+/**
+ * latest が current より新しいか。
+ * 小数点以下は 10 進の小数ではなく通し番号なので、V1.10 は V1.9 より新しい。
+ */
+export function isNewer(latest: string, current: string): boolean {
+  const a = parseVersion(latest);
+  const b = parseVersion(current);
+  if (!a || !b) return latest !== current;
+  return a[0] !== b[0] ? a[0] > b[0] : a[1] > b[1];
+}
+
 /** その版を知らせるべきか */
 export function shouldNotify(latest: string, current: string, now = Date.now()): boolean {
-  if (latest === current) return false;
+  // 公開側の控えが古いまま残っていることがあるので、新しいときだけ知らせる
+  if (!isNewer(latest, current)) return false;
   if (skippedVersion() === latest) return false;
   return !isSnoozed(now);
 }

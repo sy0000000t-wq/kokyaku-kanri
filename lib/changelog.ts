@@ -11,6 +11,14 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "V1.16",
+    date: "2026-09-14",
+    changes: [
+      "請求・入金の年間マトリクスも、物件名称だけを固定して横に流せるようにしました（点検スケジュールと同じ）",
+      "今より古い版を「新しい版」と知らせてしまうことがあったのを直しました",
+    ],
+  },
+  {
     version: "V1.15",
     date: "2026-09-14",
     changes: [

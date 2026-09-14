@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   clearSkip,
+  isNewer,
   isSnoozed,
   shouldNotify,
   skipVersion,
@@ -60,5 +61,21 @@ describe("更新を受け取るかどうか", () => {
     const nextDay = now + 25 * 60 * 60 * 1000;
     expect(isSnoozed(nextDay)).toBe(false);
     expect(shouldNotify("V1.14", "V1.13", nextDay)).toBe(true);
+  });
+});
+
+describe("版の新旧", () => {
+  it("小数点以下は通し番号として比べる（V1.10 は V1.9 より新しい）", () => {
+    expect(isNewer("V1.10", "V1.9")).toBe(true);
+    expect(isNewer("V1.9", "V1.10")).toBe(false);
+  });
+
+  it("整数が上がれば新しい", () => {
+    expect(isNewer("V2.0", "V1.16")).toBe(true);
+  });
+
+  it("古い版や同じ版は知らせない", () => {
+    expect(shouldNotify("V1.15", "V1.16")).toBe(false);
+    expect(shouldNotify("V1.16", "V1.16")).toBe(false);
   });
 });

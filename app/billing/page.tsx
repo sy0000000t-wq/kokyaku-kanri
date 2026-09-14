@@ -303,11 +303,12 @@ function BillingPageInner() {
             <table className="w-full min-w-[1700px] text-sm">
               <thead className="border-b border-line bg-canvas text-xs text-muted">
                 <tr>
-                  <th className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
-                    顧客ID
-                  </th>
-                  <th className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
+                  {/* 横に流しても物件が分かるよう、物件名称だけを固定する（点検スケジュールと揃える） */}
+                  <th className="sticky-col sticky-col-shadow left-0 w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
                     物件名称
+                  </th>
+                  <th className="w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
+                    顧客ID
                   </th>
                   <th className="w-32 px-2.5 py-2 text-left font-medium">
                     請求月
@@ -334,10 +335,7 @@ function BillingPageInner() {
                       !c.isActive && "text-muted opacity-70",
                     )}
                   >
-                    <td className="sticky-col left-0 px-2.5 py-1.5 font-mono text-xs">
-                      {c.code}
-                    </td>
-                    <td className="sticky-col sticky-col-shadow left-[6.5rem] px-2.5 py-1.5">
+                    <td className="sticky-col sticky-col-shadow left-0 px-2.5 py-1.5">
                       <Link
                         href={`/customers/edit?id=${c.id}`}
                         className="font-medium text-brand hover:underline"
@@ -350,6 +348,9 @@ function BillingPageInner() {
                           {c.contractEndDate ? `（${formatDate(c.contractEndDate)}）` : ""}
                         </Badge>
                       )}
+                    </td>
+                    <td className="px-2.5 py-1.5 font-mono text-xs whitespace-nowrap">
+                      {c.code}
                     </td>
                     {/* 請求サイクルはプリセットにすぎないので、実際の請求月を出す */}
                     <td className="px-2.5 py-1.5 text-xs">
