@@ -83,159 +83,8 @@ function SchedulePageInner() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_15rem]">
-        <Card className="overflow-hidden">
-          <CardHeader
-            title="年間マトリクス"
-            description="● が通常点検、★ が年次点検。「点検」を押すと緑、「報告」を押すと青になります（報告＝報告書の提出済み）"
-          />
-          {rows.length === 0 ? (
-            <EmptyState>表示できる顧客がありません。</EmptyState>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1080px] text-sm">
-                <thead className="border-b border-line bg-canvas text-xs text-muted">
-                  <tr>
-                    <th className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
-                      顧客ID
-                    </th>
-                    <th className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
-                      物件名称
-                    </th>
-                    <th className="px-2.5 py-2 text-right font-medium">距離</th>
-                    <th className="px-2.5 py-2 text-left font-medium">周期</th>
-                    {MONTHS.map((m) => (
-                      <th
-                        key={m}
-                        className={cn(
-                          "px-1 py-2 text-center font-medium",
-                          m === period.month && "bg-brand-soft text-brand",
-                        )}
-                      >
-                        {m}月
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((c) => (
-                    <tr
-                      key={c.id}
-                      className={cn(
-                        "border-b border-line last:border-0",
-                        !c.isActive && "text-muted opacity-70",
-                      )}
-                    >
-                      <td className="sticky-col left-0 px-2.5 py-1.5 font-mono text-xs">
-                        {c.code}
-                      </td>
-                      <td className="sticky-col sticky-col-shadow left-[6.5rem] px-2.5 py-1.5">
-                        <Link
-                          href={`/customers/edit?id=${c.id}`}
-                          className="font-medium text-brand hover:underline"
-                        >
-                          {c.name}
-                        </Link>
-                        {!c.isActive && (
-                          <Badge className="ml-1.5">
-                            解除
-                            {c.contractEndDate ? `（${formatDate(c.contractEndDate)}）` : ""}
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="tabular px-2.5 py-1.5 text-right text-xs whitespace-nowrap">
-                        {formatKm(c.distanceKm)}
-                      </td>
-                      <td className="px-2.5 py-1.5 text-xs whitespace-nowrap">
-                        {c.inspectionCycle?.name ?? "—"}
-                      </td>
-                      {MONTHS.map((m) => {
-                        const target = getInspectionTarget(
-                          {
-                            isActive: c.isActive,
-                            contractStartDate: c.contractStartDate,
-                            contractEndDate: c.contractEndDate,
-                            inspectionMonths: c.inspectionMonths,
-                            annualInspectionMonth: c.annualInspectionMonth,
-                          },
-                          { year: period.year, month: m },
-                        );
-                        const showRegular = target.regular && typeFilter !== "annual";
-                        const showAnnual = target.annual && typeFilter !== "regular";
-                        const regular = cellFor(c, m, "regular");
-                        const annual = cellFor(c, m, "annual");
-
-                        return (
-                          <td
-                            key={m}
-                            className={cn(
-                              "border-l border-line px-1 py-1.5 text-center align-top",
-                              m === period.month && "bg-brand-soft/40",
-                            )}
-                          >
-                            {!showRegular && !showAnnual && (
-                              <div className="text-xs leading-4 text-muted">−</div>
-                            )}
-                            {/* 種別ごとに1行。記号がその行の点検を表す */}
-                            {showRegular && (
-                              <div className="flex items-center justify-center gap-1">
-                                <span className="text-xs text-brand">●</span>
-                                <InspectionCheck
-                                  customerId={c.id}
-                                  customerName={c.name}
-                                  year={period.year}
-                                  month={m}
-                                  type="regular"
-                                  isDone={regular.isDone}
-                                />
-                                <ReportedCheck
-                                  customerId={c.id}
-                                  customerName={c.name}
-                                  year={period.year}
-                                  month={m}
-                                  type="regular"
-                                  isReported={regular.isReported}
-                                />
-                              </div>
-                            )}
-                            {showAnnual && (
-                              <div
-                                className={cn(
-                                  "flex items-center justify-center gap-1",
-                                  showRegular && "mt-1",
-                                )}
-                              >
-                                <span className="text-xs text-warn">★</span>
-                                <InspectionCheck
-                                  customerId={c.id}
-                                  customerName={c.name}
-                                  year={period.year}
-                                  month={m}
-                                  type="annual"
-                                  isDone={annual.isDone}
-                                />
-                                <ReportedCheck
-                                  customerId={c.id}
-                                  customerName={c.name}
-                                  year={period.year}
-                                  month={m}
-                                  type="annual"
-                                  isReported={annual.isReported}
-                                />
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-
         {/* 集計パネル */}
-        <Card className="h-fit">
+        <Card className="h-fit xl:order-2">
           <CardHeader title={`対象月：${period.month}月`} />
           <dl className="divide-y divide-line text-sm">
             <SumRow label="通常点検">{regularCount} 件</SumRow>
@@ -264,13 +113,14 @@ function SchedulePageInner() {
             )}
           </dl>
         </Card>
+        <div className="xl:order-1">
+          <FocusItems
+            year={period.year}
+            month={period.month}
+            hasAnnualTarget={annualCount > 0}
+          />
+        </div>
       </div>
-
-      <FocusItems
-        year={period.year}
-        month={period.month}
-        hasAnnualTarget={annualCount > 0}
-      />
 
       {/* 当月リスト（モバイル主用途） */}
       <Card>
@@ -293,7 +143,7 @@ function SchedulePageInner() {
                     key={o.value}
                     href={`/schedule?${params.toString()}`}
                     className={cn(
-                      "rounded px-2.5 py-1 text-xs",
+                      "rounded px-2.5 py-1 text-xs whitespace-nowrap",
                       listView === o.value
                         ? "bg-brand text-white"
                         : "text-muted hover:text-ink",
@@ -340,6 +190,159 @@ function SchedulePageInner() {
                 </ul>
               </section>
             ))}
+          </div>
+        )}
+      </Card>
+
+      {/* 年間の見通しは、当月の作業を終えてから見るので一番下に置く */}
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="年間マトリクス"
+          description="● が通常点検、★ が年次点検。「点検」を押すと緑、「報告」を押すと青になります（報告＝報告書の提出済み）"
+        />
+        {rows.length === 0 ? (
+          <EmptyState>表示できる顧客がありません。</EmptyState>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1080px] text-sm">
+              <thead className="border-b border-line bg-canvas text-xs text-muted">
+                <tr>
+                  {/* 横に流しても物件が分かるよう、物件名称だけを固定する */}
+                  <th className="sticky-col sticky-col-shadow left-0 w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
+                    物件名称
+                  </th>
+                  <th className="w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
+                    顧客ID
+                  </th>
+                  <th className="px-2.5 py-2 text-right font-medium">距離</th>
+                  <th className="px-2.5 py-2 text-left font-medium">周期</th>
+                  {MONTHS.map((m) => (
+                    <th
+                      key={m}
+                      className={cn(
+                        "px-1 py-2 text-center font-medium",
+                        m === period.month && "bg-brand-soft text-brand",
+                      )}
+                    >
+                      {m}月
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c) => (
+                  <tr
+                    key={c.id}
+                    className={cn(
+                      "border-b border-line last:border-0",
+                      !c.isActive && "text-muted opacity-70",
+                    )}
+                  >
+                    <td className="sticky-col sticky-col-shadow left-0 px-2.5 py-1.5">
+                      <Link
+                        href={`/customers/edit?id=${c.id}`}
+                        className="font-medium text-brand hover:underline"
+                      >
+                        {c.name}
+                      </Link>
+                      {!c.isActive && (
+                        <Badge className="ml-1.5">
+                          解除
+                          {c.contractEndDate ? `（${formatDate(c.contractEndDate)}）` : ""}
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="px-2.5 py-1.5 font-mono text-xs whitespace-nowrap">
+                      {c.code}
+                    </td>
+                    <td className="tabular px-2.5 py-1.5 text-right text-xs whitespace-nowrap">
+                      {formatKm(c.distanceKm)}
+                    </td>
+                    <td className="px-2.5 py-1.5 text-xs whitespace-nowrap">
+                      {c.inspectionCycle?.name ?? "—"}
+                    </td>
+                    {MONTHS.map((m) => {
+                      const target = getInspectionTarget(
+                        {
+                          isActive: c.isActive,
+                          contractStartDate: c.contractStartDate,
+                          contractEndDate: c.contractEndDate,
+                          inspectionMonths: c.inspectionMonths,
+                          annualInspectionMonth: c.annualInspectionMonth,
+                        },
+                        { year: period.year, month: m },
+                      );
+                      const showRegular = target.regular && typeFilter !== "annual";
+                      const showAnnual = target.annual && typeFilter !== "regular";
+                      const regular = cellFor(c, m, "regular");
+                      const annual = cellFor(c, m, "annual");
+
+                      return (
+                        <td
+                          key={m}
+                          className={cn(
+                            "border-l border-line px-1 py-1.5 text-center align-top",
+                            m === period.month && "bg-brand-soft/40",
+                          )}
+                        >
+                          {!showRegular && !showAnnual && (
+                            <div className="text-xs leading-4 text-muted">−</div>
+                          )}
+                          {/* 種別ごとに1行。記号がその行の点検を表す */}
+                          {showRegular && (
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-xs text-brand">●</span>
+                              <InspectionCheck
+                                customerId={c.id}
+                                customerName={c.name}
+                                year={period.year}
+                                month={m}
+                                type="regular"
+                                isDone={regular.isDone}
+                              />
+                              <ReportedCheck
+                                customerId={c.id}
+                                customerName={c.name}
+                                year={period.year}
+                                month={m}
+                                type="regular"
+                                isReported={regular.isReported}
+                              />
+                            </div>
+                          )}
+                          {showAnnual && (
+                            <div
+                              className={cn(
+                                "flex items-center justify-center gap-1",
+                                showRegular && "mt-1",
+                              )}
+                            >
+                              <span className="text-xs text-warn">★</span>
+                              <InspectionCheck
+                                customerId={c.id}
+                                customerName={c.name}
+                                year={period.year}
+                                month={m}
+                                type="annual"
+                                isDone={annual.isDone}
+                              />
+                              <ReportedCheck
+                                customerId={c.id}
+                                customerName={c.name}
+                                year={period.year}
+                                month={m}
+                                type="annual"
+                                isReported={annual.isReported}
+                              />
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>

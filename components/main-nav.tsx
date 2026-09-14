@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "ダッシュボード" },
-  { href: "/customers", label: "顧客マスタ" },
   { href: "/schedule", label: "点検スケジュール" },
   { href: "/billing", label: "請求・入金" },
+  { href: "/customers", label: "顧客マスタ" },
   { href: "/settings", label: "設定" },
   { href: "/help", label: "使い方" },
 ];

@@ -86,152 +86,26 @@ function BillingPageInner() {
         </div>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_16rem]">
-        <Card className="overflow-hidden">
-          <CardHeader
-            title="年間マトリクス"
-            description="上段＝その月に立つ請求（額はクリックで編集・請＝請求済み）、下段＝その月に入る入金（入＝入金済み）。隔月などは対象期間の最終月にまとめて請求し、入金はその翌月以降に立ちます"
-          />
-          {rows.length === 0 ? (
-            <EmptyState>表示できる顧客がありません。</EmptyState>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[1700px] text-sm">
-                <thead className="border-b border-line bg-canvas text-xs text-muted">
-                  <tr>
-                    <th className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
-                      顧客ID
-                    </th>
-                    <th className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
-                      物件名称
-                    </th>
-                    <th className="w-32 px-2.5 py-2 text-left font-medium">
-                      請求月
-                    </th>
-                    {MONTHS.map((m) => (
-                      <th
-                        key={m}
-                        className={cn(
-                          "px-1 py-2 text-center font-medium",
-                          m === period.month && "bg-brand-soft text-brand",
-                        )}
-                      >
-                        {m}月
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((c) => (
-                    <tr
-                      key={c.id}
-                      className={cn(
-                        "border-b border-line last:border-0",
-                        !c.isActive && "text-muted opacity-70",
-                      )}
-                    >
-                      <td className="sticky-col left-0 px-2.5 py-1.5 font-mono text-xs">
-                        {c.code}
-                      </td>
-                      <td className="sticky-col sticky-col-shadow left-[6.5rem] px-2.5 py-1.5">
-                        <Link
-                          href={`/customers/edit?id=${c.id}`}
-                          className="font-medium text-brand hover:underline"
-                        >
-                          {c.name}
-                        </Link>
-                        {!c.isActive && (
-                          <Badge className="ml-1.5">
-                            解除
-                            {c.contractEndDate ? `（${formatDate(c.contractEndDate)}）` : ""}
-                          </Badge>
-                        )}
-                      </td>
-                      {/* 請求サイクルはプリセットにすぎないので、実際の請求月を出す */}
-                      <td className="px-2.5 py-1.5 text-xs">
-                        {c.billingMonths.length === 0
-                          ? "—"
-                          : c.billingMonths.length === 12
-                            ? "毎月"
-                            : `${c.billingMonths.join("・")}月`}
-                      </td>
-                      {MONTHS.map((m) => {
-                        const billing = cellFor(c, m);
-                        const payment = paymentCellFor(c, m);
-                        if (!billing.isTarget && !payment) {
-                          return (
-                            <td
-                              key={m}
-                              className="border-l border-line bg-canvas px-1 py-1.5 text-center text-xs text-muted"
-                              title="請求・入金の予定なし"
-                            >
-                              −
-                            </td>
-                          );
-                        }
-                        return (
-                          <td key={m} className="border-l border-line px-1 py-1.5 align-top">
-                            <div className="min-w-[6.5rem] space-y-1">
-                              {billing.isTarget && (
-                                <BillingBox
-                                  customerId={c.id}
-                                  customerName={c.name}
-                                  year={billing.year}
-                                  month={billing.month}
-                                  amount={billing.amount}
-                                  defaultAmount={billing.defaultAmount}
-                                  isBilled={billing.isBilled}
-                                  coveredMonths={billing.coveredMonths}
-                                  paymentLagMonths={c.paymentLagMonths}
-                                />
-                              )}
-                              {payment && (
-                                <PaymentBox
-                                  customerId={c.id}
-                                  customerName={c.name}
-                                  year={payment.year}
-                                  month={payment.month}
-                                  amount={payment.amount}
-                                  defaultAmount={payment.defaultAmount}
-                                  isPaid={payment.isPaid}
-                                  isOverdue={payment.isOverdue}
-                                  coveredMonths={payment.coveredMonths}
-                                  paymentLagMonths={c.paymentLagMonths}
-                                />
-                              )}
-                            </div>
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-
-        <Card className="h-fit">
-          <CardHeader title={`${formatYearMonth(period.year, period.month)}の集計`} />
-          <dl className="divide-y divide-line text-sm">
-            <SumRow label="今月の請求予定額" count={monthCells.length}>
-              {formatYen(billingTotal)}
-            </SumRow>
-            <SumRow label="うち請求済み" count={billedCells.length}>
-              {formatYen(billedTotal)}
-            </SumRow>
-            <SumRow label="今月の入金予定額" count={paymentCells.length}>
-              {formatYen(paymentTotal)}
-            </SumRow>
-            <SumRow label="うち入金済み" count={paidCells.length}>
-              {formatYen(paidTotal)}
-            </SumRow>
-            <SumRow label="未入金（期日超過）" count={overdueCells.length} tone="danger">
-              {formatYen(overdueTotal)}
-            </SumRow>
-          </dl>
-        </Card>
-      </div>
+      <Card className="h-fit">
+        <CardHeader title={`${formatYearMonth(period.year, period.month)}の集計`} />
+        <dl className="divide-y divide-line text-sm">
+          <SumRow label="今月の請求予定額" count={monthCells.length}>
+            {formatYen(billingTotal)}
+          </SumRow>
+          <SumRow label="うち請求済み" count={billedCells.length}>
+            {formatYen(billedTotal)}
+          </SumRow>
+          <SumRow label="今月の入金予定額" count={paymentCells.length}>
+            {formatYen(paymentTotal)}
+          </SumRow>
+          <SumRow label="うち入金済み" count={paidCells.length}>
+            {formatYen(paidTotal)}
+          </SumRow>
+          <SumRow label="未入金（期日超過）" count={overdueCells.length} tone="danger">
+            {formatYen(overdueTotal)}
+          </SumRow>
+        </dl>
+      </Card>
 
       <Card>
         <CardHeader
@@ -254,7 +128,7 @@ function BillingPageInner() {
                     key={o.value}
                     href={`/billing?${params.toString()}`}
                     className={cn(
-                      "rounded px-2.5 py-1 text-xs",
+                      "rounded px-2.5 py-1 text-xs whitespace-nowrap",
                       quick === o.value ? "bg-brand text-white" : "text-muted hover:text-ink",
                     )}
                   >
@@ -413,6 +287,131 @@ function BillingPageInner() {
               </div>
             )}
           </section>
+        )}
+      </Card>
+
+      {/* 年間の見通しは、当月の作業を終えてから見るので一番下に置く */}
+      <Card className="overflow-hidden">
+        <CardHeader
+          title="年間マトリクス"
+          description="上段＝その月に立つ請求（額はクリックで編集・請＝請求済み）、下段＝その月に入る入金（入＝入金済み）。隔月などは対象期間の最終月にまとめて請求し、入金はその翌月以降に立ちます"
+        />
+        {rows.length === 0 ? (
+          <EmptyState>表示できる顧客がありません。</EmptyState>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1700px] text-sm">
+              <thead className="border-b border-line bg-canvas text-xs text-muted">
+                <tr>
+                  <th className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 text-left font-medium whitespace-nowrap">
+                    顧客ID
+                  </th>
+                  <th className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 px-2.5 py-2 text-left font-medium sm:w-56 sm:min-w-56">
+                    物件名称
+                  </th>
+                  <th className="w-32 px-2.5 py-2 text-left font-medium">
+                    請求月
+                  </th>
+                  {MONTHS.map((m) => (
+                    <th
+                      key={m}
+                      className={cn(
+                        "px-1 py-2 text-center font-medium",
+                        m === period.month && "bg-brand-soft text-brand",
+                      )}
+                    >
+                      {m}月
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c) => (
+                  <tr
+                    key={c.id}
+                    className={cn(
+                      "border-b border-line last:border-0",
+                      !c.isActive && "text-muted opacity-70",
+                    )}
+                  >
+                    <td className="sticky-col left-0 px-2.5 py-1.5 font-mono text-xs">
+                      {c.code}
+                    </td>
+                    <td className="sticky-col sticky-col-shadow left-[6.5rem] px-2.5 py-1.5">
+                      <Link
+                        href={`/customers/edit?id=${c.id}`}
+                        className="font-medium text-brand hover:underline"
+                      >
+                        {c.name}
+                      </Link>
+                      {!c.isActive && (
+                        <Badge className="ml-1.5">
+                          解除
+                          {c.contractEndDate ? `（${formatDate(c.contractEndDate)}）` : ""}
+                        </Badge>
+                      )}
+                    </td>
+                    {/* 請求サイクルはプリセットにすぎないので、実際の請求月を出す */}
+                    <td className="px-2.5 py-1.5 text-xs">
+                      {c.billingMonths.length === 0
+                        ? "—"
+                        : c.billingMonths.length === 12
+                          ? "毎月"
+                          : `${c.billingMonths.join("・")}月`}
+                    </td>
+                    {MONTHS.map((m) => {
+                      const billing = cellFor(c, m);
+                      const payment = paymentCellFor(c, m);
+                      if (!billing.isTarget && !payment) {
+                        return (
+                          <td
+                            key={m}
+                            className="border-l border-line bg-canvas px-1 py-1.5 text-center text-xs text-muted"
+                            title="請求・入金の予定なし"
+                          >
+                            −
+                          </td>
+                        );
+                      }
+                      return (
+                        <td key={m} className="border-l border-line px-1 py-1.5 align-top">
+                          <div className="min-w-[6.5rem] space-y-1">
+                            {billing.isTarget && (
+                              <BillingBox
+                                customerId={c.id}
+                                customerName={c.name}
+                                year={billing.year}
+                                month={billing.month}
+                                amount={billing.amount}
+                                defaultAmount={billing.defaultAmount}
+                                isBilled={billing.isBilled}
+                                coveredMonths={billing.coveredMonths}
+                                paymentLagMonths={c.paymentLagMonths}
+                              />
+                            )}
+                            {payment && (
+                              <PaymentBox
+                                customerId={c.id}
+                                customerName={c.name}
+                                year={payment.year}
+                                month={payment.month}
+                                amount={payment.amount}
+                                defaultAmount={payment.defaultAmount}
+                                isPaid={payment.isPaid}
+                                isOverdue={payment.isOverdue}
+                                coveredMonths={payment.coveredMonths}
+                                paymentLagMonths={c.paymentLagMonths}
+                              />
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 
