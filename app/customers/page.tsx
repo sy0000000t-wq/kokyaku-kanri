@@ -152,11 +152,12 @@ function CustomersPageInner() {
             <table className="w-full text-sm" style={{ minWidth: tableMinWidth }}>
               <thead className="border-b border-line bg-canvas text-xs text-muted">
                 <tr className="[&>th]:px-2.5 [&>th]:py-2 [&>th]:text-left [&>th]:font-medium">
-                  <th className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] whitespace-nowrap">
-                    <SortLink label="顧客ID" sortKey="code" sp={sp} />
-                  </th>
-                  <th className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 sm:w-52 sm:min-w-52">
+                  {/* 横に流しても物件が分かるよう、物件名称だけを固定する（点検・請求と揃える） */}
+                  <th className="sticky-col sticky-col-shadow left-0 w-40 min-w-40 sm:w-52 sm:min-w-52">
                     <SortLink label="物件名称" sortKey="name" sp={sp} />
+                  </th>
+                  <th className="w-[6.5rem] min-w-[6.5rem] whitespace-nowrap">
+                    <SortLink label="顧客ID" sortKey="code" sp={sp} />
                   </th>
                   {shownColumns.map((col) => (
                     <th
@@ -187,10 +188,7 @@ function CustomersPageInner() {
                       !c.isActive && "text-muted opacity-70",
                     )}
                   >
-                    <td className="sticky-col left-0 w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 font-mono text-xs whitespace-nowrap">
-                      {c.code}
-                    </td>
-                    <td className="sticky-col sticky-col-shadow left-[6.5rem] w-40 min-w-40 px-2.5 py-2 sm:w-52 sm:min-w-52">
+                    <td className="sticky-col sticky-col-shadow left-0 w-40 min-w-40 px-2.5 py-2 sm:w-52 sm:min-w-52">
                       <Link
                         href={`/customers/edit?id=${c.id}`}
                         className="font-medium text-brand hover:underline"
@@ -202,6 +200,9 @@ function CustomersPageInner() {
                           解除{c.contractEndDate ? `（${formatDate(c.contractEndDate)}）` : ""}
                         </Badge>
                       )}
+                    </td>
+                    <td className="w-[6.5rem] min-w-[6.5rem] px-2.5 py-2 font-mono text-xs whitespace-nowrap">
+                      {c.code}
                     </td>
                     {shownColumns.map((col) => (
                       <td
@@ -229,9 +230,11 @@ function CustomersPageInner() {
               </tbody>
               <tfoot className="border-t-2 border-line bg-canvas text-xs">
                 <tr className="[&>td]:px-2.5 [&>td]:py-2">
-                  <td colSpan={2} className="sticky-col left-0 font-medium">
+                  {/* 合計の見出しも物件名称の列に置き、一緒に固定する */}
+                  <td className="sticky-col sticky-col-shadow left-0 font-medium whitespace-nowrap">
                     合計（表示中 {summary.count} 件）
                   </td>
+                  <td />
                   {shownColumns.map((col) => (
                     <td
                       key={col.id}

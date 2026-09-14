@@ -6,4 +6,4 @@
  * 整数を上げるのは大きな作り替えのときだけで、上げてよいかは必ず本人に確かめる。
  * 勝手に繰り上げない。
  */
-export const APP_VERSION = "V1.16";
+export const APP_VERSION = "V1.17";
